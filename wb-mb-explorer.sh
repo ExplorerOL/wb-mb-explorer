@@ -9,8 +9,8 @@ trap "rm -f $tempfile" 0 1 2 5 15
 
 clear
 
-touch $LOG
-echo >>$LOG
+#touch $LOG
+echo "" >$LOG
 #echo "com settings: -b9600 -pnone -s2" > $SCRIPT_DIR/mbexplorer_settings
 
 # exit confirmation window
@@ -236,6 +236,7 @@ SetMBRegType() {
 }
 
 ReadRegister() {
+    stopSerialDriver
     #cat << EOF > $tempfile;
 
     while [ 1 ]; do
@@ -254,7 +255,7 @@ ReadRegister() {
 
         # echo "start dialog" > $tempfile
 
-        $DIALOG --title "MBEXPLORER READ ADDRESS" --ok-label "Read again" --extra-button --extra-label "Write to register" --help-button --help-label "Return to main menu" --textbox $tempfile 80 100
+        $DIALOG --title "WB-MB-EXPLORER READ ADDRESS" --ok-label "Read again" --extra-button --extra-label "Write to register" --help-button --help-label "Return to main menu" --textbox $tempfile 80 100
 
         ButtonNumber=$?
 
@@ -269,6 +270,7 @@ ReadRegister() {
 }
 
 WriteRegister() {
+    stopSerialDriver
     #ReadRegister
 
     # while [ 1 ]; do
@@ -316,6 +318,8 @@ WriteRegister() {
 }
 
 QuickScan() {
+    stopSerialDriver
+
     progress=0
     echo "Scan results (quick scan)" $(date +%Y-%m-%d-%H-%M) >./qscanlog.txt
     echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>./qscanlog.txt
@@ -451,13 +455,21 @@ MainMenu() {
     esac
 }
 
+stopSerialDriver() {
+    if [[ ($(systemctl is-active --quiet wb-mqtt-serial) -eq 0) ]]; then
+        echo "Stopping service wb-mqtt-serial"
+        systemctl stop wb-mqtt-serial
+    fi
+
+}
 #Stop driver wb-mqtt-serial
-if [[ $(ps aux | grep [s]erial | wc -l) != 0 ]]; then
-    echo "Stopping service wb-mqtt-serial"
-    service wb-mqtt-serial stop
-fi
+# if [[ $(ps aux | grep [s]erial | wc -l) != 0 ]]; then
+#     echo "Stopping service wb-mqtt-serial"
+#     service wb-mqtt-serial stop
+# fi
 
 #Reading current communication settings
+stopSerialDriver
 ReadCommunicationSettings
 
 #Show main menu
