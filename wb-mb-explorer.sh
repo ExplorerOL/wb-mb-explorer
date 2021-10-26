@@ -246,18 +246,20 @@ modbusReadRaw() {
 
 modbusWrite() {
     #echo $(modbus_client -mrtu -pnone -s2 $COM_PORT -a$MB_ADDRESS -t0x03 -r$R -c$C | grep Data | sed 's/.*Data://' | sed 's/ //g')
-    modbus_client -mrtu $COM_PORT --debug -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $1
+    modbus_client -mrtu $COM_PORT --debug -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $1 2>&1
 }
 
+#Function of reading hex value from Modbus register
+#   If reading was successfull - hex value is returned
+#   If reading was unsuccessfull - full output with error is returned
 modbusReadHexValue() {
-    echo $(modbusReadRaw $1 $2 $3 $4 | grep Data | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
-    #
-    #
-    #readRawResult=$(modbusReadRaw $1 $2 $3 $4)
-
-    #readHexValue=$(echo $readRawResult | grep Data | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
-    #readRawResult2=$readRawResult
-    #echo "$readHexValue"
+    readRawResult=$(modbusReadRaw $1 $2 $3 $4)
+    readHexValue=$(echo "$readRawResult" | grep Data | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+    if [[ -n $readHexValue ]]; then
+        echo $readHexValue
+    else
+        echo "$readRawResult"
+    fi
 }
 
 valueHexToDec() {
@@ -283,21 +285,29 @@ readDeviceInfo() {
     while [ 1 ]; do
         echo "" >$tempfile
 
-        #Device model
-        echo "Device model:" $(modbusReadText $MB_ADDRESS 4 200 6) >>$tempfile
+        local deviceAddress=$(modbusReadHexValue $MB_ADDRESS 3 128 1)
 
-        #Device serial number
-        local serialNumber=$(modbusReadHexValue $MB_ADDRESS 4 270 2)
-        serialNumber=$(valueHexToDec $serialNumber)
-        echo "Device serial number:" $serialNumber >>$tempfile
+        if [[ -z $(echo $deviceAddress | grep ERROR) ]]; then
+            #Device model
+            echo "Device model:" $(modbusReadText $MB_ADDRESS 4 200 6) >>$tempfile
 
-        #Device FW version
-        echo "Device FW version:" $(modbusReadText $MB_ADDRESS 4 250 16) >>$tempfile
-        #Device FW signature
-        echo "Device FW signature:" $(modbusReadText $MB_ADDRESS 4 290 12) >>$tempfile
-        #Device uptime
-        echo "Device uptime (s):" $(valueHexToDec $(modbusReadHexValue $MB_ADDRESS 4 104 2)) >>$tempfile
+            #Device serial number
+            local serialNumber=$(modbusReadHexValue $MB_ADDRESS 4 270 2)
+            serialNumber=$(valueHexToDec $serialNumber)
+            echo "Device serial number:" $serialNumber >>$tempfile
 
+            #Device FW version
+            echo "Device FW version:" $(modbusReadText $MB_ADDRESS 4 250 16) >>$tempfile
+
+            #Device FW signature
+            echo "Device FW signature:" $(modbusReadText $MB_ADDRESS 4 290 12) >>$tempfile
+
+            #Device uptime
+            echo "Device uptime (s):" $(valueHexToDec $(modbusReadHexValue $MB_ADDRESS 4 104 2)) >>$tempfile
+        else
+            echo -e "\nError: device with current settings is unavailable!" >>$tempfile
+            echo -e "\nCheck communication settings and device connection." >>$tempfile
+        fi
         #sleep 2
 
         $DIALOG --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "READ DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $tempfile 20 90
@@ -312,6 +322,13 @@ readDeviceInfo() {
 
 ReadRegister() {
     stopSerialDriver
+    # #for test
+    # readResult=$(modbusReadHexValue $MB_ADDRESS 3 1280 1)
+    # echo -e "*readResult=$readResult"
+    # #echo "*readRawResult="$readRawResult""
+    # exit
+    # ############
+
     #cat << EOF > $tempfile;
 
     while [ 1 ]; do
@@ -330,27 +347,31 @@ ReadRegister() {
         esac
 
         #modbus_client $COM_PORT $MB_ADDRESS $BAUDRATE $STOPBITS $PARITY $MBFunction $MB_REGISTER >>$tempfile
-        readResult=$(modbusReadHexValue $MB_ADDRESS $MBFunction $MB_REGISTER 1)
+        local readResult=$(modbusReadHexValue $MB_ADDRESS $MBFunction $MB_REGISTER 1)
         #echo "hello $readRawResult2"
         #echo $readResult
 
-        if [[ "$readResult" = "" ]]; then
-            echo "Error reading register $MB_REGISTER" >>$tempfile
-            echo "" >>$tempfile
-            #echo "hello $readRawResult2" >>$tempfile
-            echo $readRawResult #>$tempfile
-            #sleep 2
+        if [[ -z $(echo $readResult | grep ERROR) ]]; then
+            #echo "*SUCCESS $readResult"
+            echo "Read data (hex): 0x$readResult" >>$tempfile
+            readResult=$(valueHexToDec $readResult)
+            echo "Read data (dec): $readResult" >>$tempfile
 
         else
-            echo "Read data (hex): 0x$readResult" >>$tempfile
+            # echo "*ERROR $readResult"
+            echo "Error reading register $MB_REGISTER" >>$tempfile
+            echo "" >>$tempfile
+            echo "$readResult" >>$tempfile
 
+            #echo "hello $readRawResult2" >>$tempfile
+            #sleep 2
             #readResult=$(modbusReadHexValue $readResult)
             #readResult=$(echo $((16#$readResult)))
             #readResult=$(echo $readResult | sed 's/)
-            readResult=$(valueHexToDec $readResult)
-            echo "Read data (dec): $readResult" >>$tempfile
+
             #echo "Reg data (dec): $((echo 16#$(echo $readResult | sed 's/0x//g')))) " >>$tempfile
         fi
+
         # readResult=$(modbusRead)
         # echo $readResult
         # if [[ $(echo $readResult | grep SUCCESS) ]]; then
@@ -360,7 +381,7 @@ ReadRegister() {
         #     echo "Error reading register"
         # fi
 
-        $DIALOG --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "READ REGISTER" --ok-label "Read register" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $tempfile 20 90 # echo "start dialog" > $tempfile
+        $DIALOG --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "READ REGISTER" --ok-label "Read register" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $tempfile 25 90 # echo "start dialog" > $tempfile
 
         ButtonNumber=$?
 
@@ -430,11 +451,11 @@ WriteRegister() {
 
     # sleep 4
 
-    if [[ "$(echo $writeResult | grep ERROR)" != "" ]]; then
-        echo "Error writing register!!! $write_result" >$tempfile
+    if [[ -n "$(echo $writeResult | grep ERROR)" ]]; then
+        echo -e "\nError writing register!!!\n\n$writeResult" >$tempfile
 
-    elif [[ "$(echo $writeResult | grep SUCCESS)" != "" ]]; then
-        echo -e "\n Data $MBRegisterNewValue was successfully written to register $MB_REGISTER" >$tempfile
+    elif [[ -n "$(echo $writeResult | grep SUCCESS)" ]]; then
+        echo -e "\nData $MBRegisterNewValue was successfully written to register $MB_REGISTER" >$tempfile
 
         # #readResult=$(modbusReadHexValue $readResult)
         # #readResult=$(echo $((16#$readResult)))
@@ -469,24 +490,16 @@ QuickScan() {
             echo "XXX"
             echo $(($progress * 100 / 247))
             echo -e "\nQuick scan of devices using Port = $COM_PORT, Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS"
-            #echo "Current trial:"
             echo "Address = $a"
-            #echo "Reply from address: $Address"
             echo " "
             tail -n10 ./qscanlog.txt
             echo "XXX"
 
-            #local Address=$(modbus_client -mrtu $COM_PORT --debug -o200 -a$a $ComSettings -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t0x03 -r0x80 2>/dev/null | grep Data: | sed -e 's/Data://')
-            local Address=$(modbusReadHexValue $a 3 128 1)
-            if [[ -n "$Address" ]]; then
+            local scanResult=$(modbusReadHexValue $a 3 128 1)
+            if [[ -z $(echo $scanResult | grep ERROR) ]]; then
                 devNumber=$(($devNumber + 1))
-                # echo -e $(modbus_client -mrtu $COM_PORT --debug -o200 -a$a $ComSettings -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t0x03 -r200 -c 6 | grep Data | sed -e 's/0x00/\\\x/g' -e 's/Data://' -e 's/\s//g') | tr -d "\0" >$tempfile
-                # WBDeviceModel=$(cat $tempfile)
                 MB_ADDRESS=$a
                 WBDeviceModel=$(modbusReadText $MB_ADDRESS 4 200 6)
-                #echo "Device FW version:" $(modbusReadText 4 250 16) >>$tempfile
-                # echo -e $(modbus_client -mrtu $COM_PORT --debug -o200 -a$a $ComSettings -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t0x03 -r250 -c 15 | grep Data | sed -e 's/0x00/\\\x/g' -e 's/Data://' -e 's/\s//g') | tr -d "\0" >$tempfile
-                # WBFWVersion=$(cat $tempfile)
                 WBFWVersion=$(modbusReadText $MB_ADDRESS 4 250 16)
 
                 echo "$devNumber Address = $a, Device model = $WBDeviceModel, FW version = $WBFWVersion" >>./qscanlog.txt
@@ -565,8 +578,8 @@ MainMenu() {
         "Settings" "set communication settings" \
         "Read device info" "read information about device" \
         "Read/write register" "read register using current settings" \
-        "1 Quick device scan" "scan network using current settings (about 4 min)" \
-        "2 Complete device scan" "scan network using all settings combinations" 2>${tempfile}
+        "1 Quick device scan" "scan network using current settings (about 2 min)" \
+        "2 Complete device scan" "scan network using all settings combinations (about 15 min)" 2>${tempfile}
 
     case $? in
     0) #InfoDialog `cat ${tempfile}`
@@ -619,3 +632,9 @@ ReadCommunicationSettings
 
 #Show main menu
 MainMenu
+
+#modbusReadRaw 195 4 128 1
+#modbusReadHexValue 195 4 128 1
+
+#echo "readRawResult=$readRawResult"
+#ReadRegister
