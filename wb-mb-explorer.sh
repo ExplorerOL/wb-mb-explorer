@@ -198,7 +198,7 @@ SetAddress() {
             MB_ADDRESS=$value
         else
             #echo "else"
-            showInfoBox "INFO" "Entered device address is incorrect!"
+            showMsgBox "INFO" "Entered device address is incorrect!"
             #$DIALOG --sleep 2 --title "INFO" --infobox "Entered device address is incorrect!" 10 52
             #$DIALOG --title "INFO" --msgbox "Entered device address is incorrect!" 10 52
             SetAddress
@@ -285,6 +285,7 @@ modbusReadText() {
 
 readDeviceInfo() {
     while [ 1 ]; do
+        stopSerialDriver
         echo "" >$tempfile
 
         local deviceAddress=$(modbusReadHexValue $MB_ADDRESS 3 128 1)
@@ -305,7 +306,14 @@ readDeviceInfo() {
             echo "FW signature:" $(modbusReadText $MB_ADDRESS 4 290 12) >>$tempfile
 
             #Device uptime
-            echo "Device uptime (s):" $(valueHexToDec $(modbusReadHexValue $MB_ADDRESS 4 104 2)) >>$tempfile
+            echo "Uptime (s):" $(valueHexToDec $(modbusReadHexValue $MB_ADDRESS 4 104 2)) >>$tempfile
+
+            #Device voltage supply
+            local supply_voltage=$(modbusReadHexValue $MB_ADDRESS 4 121 1)
+            supply_voltage=$(valueHexToDec $supply_voltage)
+            supply_voltage=$(echo "scale=3;$supply_voltage / 1000" | bc -l)
+            echo "Supply voltage (V): $supply_voltage" >>$tempfile
+
         else
             echo -e "\nError: device with current settings is unavailable!" >>$tempfile
             echo -e "\nCheck communication settings and device connection." >>$tempfile
@@ -431,39 +439,28 @@ WriteRegister() {
     $DIALOG --title "WRITE REGISTER" --inputbox "Enter new register value in decimal (100) or hex (0x64)" 16 51 2>$tempfile
 
     case $? in
-    0) if [[ ($(cat $tempfile) -ge 0) && ($(cat $tempfile) -le 65535) ]]; then
-        #&& ("$(cat $tempfile)" -ne "")
-        #local
-        MBRegisterNewValue=$(cat $tempfile)
-    else
-        $DIALOG --sleep 2 --title "INFO BOX" --infobox "Wrong new value was entered!" 10 52
-        ReadRegister
-    fi ;;
+    0)
+        local input_value="$(cat $tempfile)"
+        if [[ $input_value -le 0 && $input_value -ge 65535 && -z $input_value ]]; then
+            $DIALOG --sleep 2 --title "INFO BOX" --infobox "Wrong new value was entered!" 10 52
+            ReadRegister
+        fi
+        ;;
     esac
 
-    #modbus_client -mrtu $COM_PORT --debug -o 300 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $MBRegisterNewValue >$tempfile
-    #modbusWrite
-    local writeResult=$(modbusWrite $MBRegisterNewValue)
+    local writeResult=$(modbusWrite $input_value)
     # echo "1 $writeResult"
     # echo "2"
     # echo $(echo $writeResult | grep SUCCESS)
     # echo $MBRegisterNewValue
     # # $("$writeResult" | grep ERROR)
-    # #echo "$writeResult" | grep SUCCESS
-
-    # sleep 4
+    #echo "$writeResult"
+    #sleep 4
 
     if [[ -n "$(echo $writeResult | grep ERROR)" ]]; then
         echo -e "\nError writing register!!!\n\n$writeResult" >$tempfile
-
     elif [[ -n "$(echo $writeResult | grep SUCCESS)" ]]; then
-        echo -e "\nData $MBRegisterNewValue was successfully written to register $MB_REGISTER" >$tempfile
-
-        # #readResult=$(modbusReadHexValue $readResult)
-        # #readResult=$(echo $((16#$readResult)))
-        # readResult=$(valueHexToDec $readResult)
-        # echo "Read data (dec): $readResult" >>$tempfile
-        # #echo "Reg data (dec): $((echo 16#$(echo $readResult | sed 's/0x//g')))) " >>$tempfile
+        echo -e "\nData $input_value was successfully written to register $MB_REGISTER" >$tempfile
     fi
 
     dialog --backtitle "$DIALOG_BACKTITLE" --title "WRITE RESULTS" --exit-label "OK" --textbox $tempfile 18 80
@@ -546,7 +543,6 @@ CompleteScan() {
                         if [[ -n $scanResult ]]; then
                             WBDeviceModel=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
                             FWVersion=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
-                            #FWVersion=$(cat $tempfile)
 
                             echo "Address = $a, Device model = $WBDeviceModel, FW version = $FWVersion, Boudrate = $b, Parity = $p, Stopbits = $s" >>$tempfile
                         fi
