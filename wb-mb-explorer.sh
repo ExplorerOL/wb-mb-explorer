@@ -4,6 +4,8 @@ SCRIPT_DIR="."
 SETTINGS_FILE="$SCRIPT_DIR/wb-mb-explorer.conf"
 LOG_FILE="$SCRIPT_DIR/wb-mb-explorer.log"
 DIALOG=${DIALOG=dialog}
+DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - programm for exploring Modbus network and configuring devices")
+
 tempfile=$(mktemp /tmp/bkp.XXXXXX)
 trap "rm -f $tempfile" 0 1 2 5 15
 
@@ -294,13 +296,13 @@ readDeviceInfo() {
             #Device serial number
             local serialNumber=$(modbusReadHexValue $MB_ADDRESS 4 270 2)
             serialNumber=$(valueHexToDec $serialNumber)
-            echo "Device serial number:" $serialNumber >>$tempfile
+            echo "Serial number:" $serialNumber >>$tempfile
 
             #Device FW version
-            echo "Device FW version:" $(modbusReadText $MB_ADDRESS 4 250 16) >>$tempfile
+            echo "FW version:" $(modbusReadText $MB_ADDRESS 4 250 16) >>$tempfile
 
             #Device FW signature
-            echo "Device FW signature:" $(modbusReadText $MB_ADDRESS 4 290 12) >>$tempfile
+            echo "FW signature:" $(modbusReadText $MB_ADDRESS 4 290 12) >>$tempfile
 
             #Device uptime
             echo "Device uptime (s):" $(valueHexToDec $(modbusReadHexValue $MB_ADDRESS 4 104 2)) >>$tempfile
@@ -310,7 +312,7 @@ readDeviceInfo() {
         fi
         #sleep 2
 
-        $DIALOG --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "READ DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $tempfile 20 90
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $tempfile 20 90
 
         case $? in
         0) continue ;;
@@ -381,7 +383,7 @@ ReadRegister() {
         #     echo "Error reading register"
         # fi
 
-        $DIALOG --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "READ REGISTER" --ok-label "Read register" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $tempfile 25 90 # echo "start dialog" > $tempfile
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ REGISTER" --ok-label "Read register" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $tempfile 25 90 # echo "start dialog" > $tempfile
 
         ButtonNumber=$?
 
@@ -464,87 +466,91 @@ WriteRegister() {
         # #echo "Reg data (dec): $((echo 16#$(echo $readResult | sed 's/0x//g')))) " >>$tempfile
     fi
 
-    dialog --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "WRITE RESULTS" --exit-label "OK" --textbox $tempfile 18 80
+    dialog --backtitle "$DIALOG_BACKTITLE" --title "WRITE RESULTS" --exit-label "OK" --textbox $tempfile 18 80
     cat $tempfile >>$LOG_FILE
 
 }
 
 QuickScan() {
+    local a
+    local scanResult
+    local devNumber=0
+    local progress=0
+
     stopSerialDriver
 
-    progress=0
-    echo "Scan results (quick scan)" $(date +"%Y-%m-%d %H:%M") >./qscanlog.txt
-    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>./qscanlog.txt
-    echo -e "------------------------------------------------------------\n" >>./qscanlog.txt
-    #ComSettings=$(cat $SCRIPT_DIR/mbexplorer_settings)
+    echo "Scan results (quick scan)" $(date +"%Y-%m-%d %H:%M") >$tempfile
+    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$tempfile
+    echo -e "------------------------------------------------------------\n" >>$tempfile
 
-    #echo $ComSettings | sed 's/com settings: //' > $tempfile
-
-    #dialog --title "Scan results" --exit-label "Return to maint menu" --textbox $tempfile 90 100
     (
-        local devNumber=0
         for a in {1..247}; do
-
-            local progress=$(($progress + 1))
+            progress=$(($progress + 1))
 
             echo "XXX"
             echo $(($progress * 100 / 247))
-            echo -e "\nQuick scan of devices using Port = $COM_PORT, Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS"
+            echo -e "\nQuick scan of devices using\n Port = $COM_PORT, Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS"
             echo "Address = $a"
             echo " "
-            tail -n10 ./qscanlog.txt
+            tail -n10 $tempfile
             echo "XXX"
 
-            local scanResult=$(modbusReadHexValue $a 3 128 1)
+            scanResult=$(modbusReadHexValue $a 4 128 1)
             if [[ -z $(echo $scanResult | grep ERROR) ]]; then
                 devNumber=$(($devNumber + 1))
-                MB_ADDRESS=$a
-                WBDeviceModel=$(modbusReadText $MB_ADDRESS 4 200 6)
-                WBFWVersion=$(modbusReadText $MB_ADDRESS 4 250 16)
+                WBDeviceModel=$(modbusReadText $a 4 200 6)
+                WBFWVersion=$(modbusReadText $a 4 250 16)
 
-                echo "$devNumber Address = $a, Device model = $WBDeviceModel, FW version = $WBFWVersion" >>./qscanlog.txt
+                echo "$devNumber Address = $a, Device model = $WBDeviceModel, FW version = $WBFWVersion" >>$tempfile
             fi
             sleep 0.01
         done
-
     ) |
-        dialog --title "QUICK SCAN" --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --gauge "progress bar" 25 120 5
+        dialog --title "QUICK SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
-    dialog --title "QUICK SCAN RESULTS" --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --exit-label "Return to main menu" --textbox ./qscanlog.txt 30 120
+    dialog --title "QUICK SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Return to main menu" --textbox $tempfile 30 120
     clear
     ReadCommunicationSettings
     MainMenu
 }
 CompleteScan() {
-    progress=0
-    echo "Scan results (complete scan)" $(date +%Y-%m-%d-%H-%M) >./log.txt
+    local a
+    local b
+    local p
+    local s
+    local scanResult
+    local devNumber=0
+    local progress=0
+
+    stopSerialDriver
+
+    echo "Scan results (complete scan)" $(date +"%Y-%m-%d %H:%M") >$tempfile
+    echo "Port = $COM_PORT" >>$tempfile
+    echo -e "------------------------------------------------------------\n" >>$tempfile
     (
-        for a in {149..150}; do
-            for b in {1200,2400,4800,9600,19200,38400,57600,115200}; do
+        for b in 9600 115200 19200 57600 38400 4800 2400 1200; do
+            for a in {1..247}; do
                 for p in {none,odd,even}; do
-
                     for s in {1,2}; do
-
                         progress=$(($progress + 1))
+
                         echo "XXX"
                         echo $(($progress / 11808))
-
-                        #printf "Modbus address:$a\tSpeed:$b\tParity:$p\tStop bits:$s"
-                        echo "Current trial:"
-                        echo "Address = $a Speed = $b Parity = $p Stop bits = $s"
-                        echo $Address
+                        echo -e "\nComplete scan of devices using Port = $COM_PORT"
+                        echo "Baudrate = $b, Address = $a,  Parity = $p, Stop bits = $s"
+                        echo " "
+                        tail -n10 $tempfile
                         echo "XXX"
 
-                        Address=$(modbus_client -mrtu /dev/ttyRS485-2 --debug -o 300 -a$a -b$b -s$s -d8 -p$p -t0x03 -r0x80 2>/dev/null | grep Data: | sed -e 's/Data://')
-                        if [[ $Address != "" ]]; then
-                            #FWVersion=`modbus_client --debug -mrtu /dev/ttyRS485-2 --debug -o 300 -a$a -b$b -s$s -d8 -p$p -t0x03 -r250 -c 6 | grep Data | sed -e 's/0x00/\\\x/g' -e 's/Data://' -e 's/\s//g'`
-                            #FWVersion=`echo -e $FWVersion 2>/dev/null`
-                            echo -e $(modbus_client --debug -mrtu /dev/ttyRS485-2 --debug -o 300 -a$a -b$b -s$s -d8 -p$p -t0x03 -r250 -c 6 | grep Data | sed -e 's/0x00/\\\x/g' -e 's/Data://' -e 's/\s//g' | sed -e 's/x00/ /') >$tempfile
-                            FWVersion=$(cat $tempfile)
+                        scanResult=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                        if [[ -n $scanResult ]]; then
+                            WBDeviceModel=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                            FWVersion=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                            #FWVersion=$(cat $tempfile)
 
-                            echo "Address = $a FW = $FWVersion Boudrate = $b Parity = $p Stopbits = $s" >>./log.txt
+                            echo "Address = $a, Device model = $WBDeviceModel, FW version = $FWVersion, Boudrate = $b, Parity = $p, Stopbits = $s" >>$tempfile
                         fi
-
+                        sleep 0.01
                     done
 
                 done
@@ -554,15 +560,15 @@ CompleteScan() {
         done
 
     ) |
-        dialog --title "wb-modbus-scan" --gauge "progress bar" 10 70 0
+        dialog --title "COMPLETE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
-    dialog --title "Scan results" --exit-label "Return to maint menu" --textbox ./log.txt 90 100
+    dialog --title "COMPLETE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $tempfile 30 120
     clear
     MainMenu
 }
 
 MainMenu() {
-    ${DIALOG} --clear --help-button --cancel-label "Exit" --backtitle "WB-MB-EXPLORER - programm for exploring Modbus network for devices and configuring them" --title "WB MB EXPLORER" \
+    ${DIALOG} --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "WB MB EXPLORER" \
         --menu "\n Current communication settings: \n\
     \n\
     Port: $COM_PORT \n\
@@ -579,7 +585,7 @@ MainMenu() {
         "Read device info" "read information about device" \
         "Read/write register" "read register using current settings" \
         "1 Quick device scan" "scan network using current settings (about 2 min)" \
-        "2 Complete device scan" "scan network using all settings combinations (about 15 min)" 2>${tempfile}
+        "2 Complete device scan" "scan network using all settings combinations (about 60 min)" 2>${tempfile}
 
     case $? in
     0) #InfoDialog `cat ${tempfile}`
