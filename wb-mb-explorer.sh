@@ -10,27 +10,26 @@ TMP_FILE=$(mktemp /tmp/bkp.XXXXXX)
 trap "rm -f $TMP_FILE" 0 1 2 5 15
 
 # exit confirmation window
-ExitDialog() {
-    ${DIALOG} --yesno "$1" 5 70
+show_exit_dialog() {
+    $DIALOG --yesno "\n            $1" 7 50
     case $? in
-    0)
-        exit
-        ;;
-    1 | 255)
-
-        MainMenu
-        ;;
+    0) exit ;;
+        #*) return ;;
     esac
 }
 
 # show message box
 show_msg_box() {
-    $DIALOG --title "$1" --msgbox "$2" 20 80
+    $DIALOG --title "$1" --msgbox "\n    $2" 20 80
 }
 
 show_yes_no_dialog() {
-    $DIALOG --title "$1" --yesno "$2" 15 61
+    $DIALOG --title "$1" --yesno "\n    $2" 15 61
 }
+
+# reboot_device() {
+#     modbus_client -mrtu $COM_PORT --debug -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t6 -r120 1 2>&1
+# }
 
 ReadCommunicationSettings() {
     if [[ -f $SETTINGS_FILE ]]; then
@@ -71,8 +70,9 @@ SaveCommunicationSettings() {
 }
 
 SetCommunicationSettings() {
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "COMMUNICATIONS SETTINGS" --clear --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
-        --menu "\n Current communication settings: \n\
+    while [ 1 ]; do
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "COMMUNICATIONS SETTINGS" --clear --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
+            --menu "\n Current communication settings: \n\
     \n\
     Port: $COM_PORT \n\
     Baudrate: $BAUDRATE \n\
@@ -84,36 +84,38 @@ SetCommunicationSettings() {
     \n\n\
      
         Chose action to do" 28 100 15 \
-        "Set port" "Current setting: $COM_PORT" \
-        "Set baudrate" "Current setting: $BAUDRATE" \
-        "Set parity" "Current setting: $PARITY" \
-        "Set stopbits" "Current setting: $STOPBITS" \
-        "Set device address" "Current setting: $MB_ADDRESS" \
-        "Set Modbus register" "Current setting: $MB_REGISTER" \
-        "Set register type" "Current setting: $MB_REG_TYPE" 2>${TMP_FILE}
+            "Set port" "Current setting: $COM_PORT" \
+            "Set baudrate" "Current setting: $BAUDRATE" \
+            "Set parity" "Current setting: $PARITY" \
+            "Set stopbits" "Current setting: $STOPBITS" \
+            "Set device address" "Current setting: $MB_ADDRESS" \
+            "Set Modbus register" "Current setting: $MB_REGISTER" \
+            "Set register type" "Current setting: $MB_REG_TYPE" 2>${TMP_FILE}
 
-    case $? in
-    0) case $(cat ${TMP_FILE}) in
-    "Set port") SetComPort ;;
-    "Set baudrate") SetBaudrate ;;
-    "Set parity") SetParity ;;
-    "Set stopbits") SetStopBits ;;
-    "Set device address") SetAddress ;;
-    "Set Modbus register") SetMBRegister ;;
-    "Set register type") SetMBRegType ;;
-    esac ;;
-    1) SaveCommunicationSettings ;;
-
-        # 2 | 255)  ;;
-    esac
-
-    MainMenu
+        case $? in
+        0) case $(cat ${TMP_FILE}) in
+        "Set port") SetComPort ;;
+        "Set baudrate") SetBaudrate ;;
+        "Set parity") SetParity ;;
+        "Set stopbits") SetStopBits ;;
+        "Set device address") SetAddress ;;
+        "Set Modbus register") SetMBRegister ;;
+        "Set register type") SetMBRegType ;;
+        esac ;;
+        1)
+            SaveCommunicationSettings
+            return
+            ;;
+        *) return ;;
+        esac
+    done
+    #MainMenu
 
 }
 
 SetComPort() {
     COM_PORT=$($DIALOG --stdout --title "Please choose a port to use" --fselect /dev/ttyRS485 14 100)
-    SetCommunicationSettings
+    #SetCommunicationSettings
 }
 
 SetBaudrate() {
@@ -136,10 +138,10 @@ SetBaudrate() {
     "57600") BAUDRATE="57600" ;;
     "115200") BAUDRATE="115200" ;;
     esac ;;
-    1 | 255) MainMenu ;;
+        #1 | 255) MainMenu ;;
     esac
 
-    SetCommunicationSettings
+    #SetCommunicationSettings
 }
 
 SetParity() {
@@ -158,7 +160,7 @@ SetParity() {
         # 1 | 255) MainMenu ;;
     esac
 
-    SetCommunicationSettings
+    #SetCommunicationSettings
 }
 
 SetStopBits() {
@@ -174,7 +176,7 @@ SetStopBits() {
         # 1 | 255) MainMenu ;;
     esac
 
-    SetCommunicationSettings
+    #SetCommunicationSettings
 }
 
 SetAddress() {
@@ -199,13 +201,13 @@ SetAddress() {
             show_msg_box "INFO" "Entered device address is incorrect!"
             #$DIALOG --sleep 2 --title "INFO" --infobox "Entered device address is incorrect!" 10 52
             #$DIALOG --title "INFO" --msgbox "Entered device address is incorrect!" 10 52
-            SetAddress
+            #SetAddress
         fi
         ;;
         # 1 | 255) MainMenu ;;
     esac
 
-    SetCommunicationSettings
+    #SetCommunicationSettings
 }
 
 SetMBRegister() {
@@ -219,7 +221,7 @@ SetMBRegister() {
         $DIALOG --sleep 2 --title "INFO" --infobox "Wrong address was entered!" 10 52
     fi ;;
     esac
-    SetCommunicationSettings
+    #SetCommunicationSettings
 
 }
 
@@ -234,7 +236,7 @@ SetMBRegType() {
     0) MB_REG_TYPE=$(cat ${TMP_FILE}) ;;
     esac
 
-    SetCommunicationSettings
+    #SetCommunicationSettings
 }
 
 modbusReadRaw() {
@@ -292,7 +294,7 @@ show_device_info() {
 
         case $? in
         0) continue ;;
-        3) MainMenu ;;
+        3) return ;;
             # 2) MainMenu ;;
         esac
     done
@@ -300,6 +302,9 @@ show_device_info() {
 }
 
 read_device_info() {
+    echo "Reading info from device using following communication settings:" >$TMP_FILE
+    echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
+    echo "----------------------------------------------------------" >>$TMP_FILE
 
     local deviceAddress=$(modbusReadHexValue $MB_ADDRESS 3 128 1)
 
@@ -399,12 +404,10 @@ ReadRegister() {
 
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ REGISTER" --ok-label "Read register again" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 90 # echo "start dialog" > $TMP_FILE
 
-        ButtonNumber=$?
-
-        case $ButtonNumber in
+        case $? in
         0) continue ;;
         3) WriteRegister ;;
-        2) MainMenu ;;
+        *) return ;;
         esac
 
     done
@@ -437,8 +440,10 @@ WriteRegister() {
     "coil") MBFunction="0x05" ;;
     "holding") MBFunction="0x06" ;;
     "descrete" | "input")
-        $DIALOG --sleep 2 --title "INFO BOX" --infobox "Register type is $MB_REG_TYPE, can't write!" 10 52
-        ReadRegister
+        #$DIALOG --sleep 2 --title "INFO BOX" --infobox "Register type is $MB_REG_TYPE, can't write!" 10 52
+        show_msg_box "ERROR" "Register type is $MB_REG_TYPE, can't write!"
+        return
+        #ReadRegister
         ;;
     esac
 
@@ -461,12 +466,12 @@ WriteRegister() {
 
         fi
 
-        dialog --backtitle "$DIALOG_BACKTITLE" --title "WRITE RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "WRITE RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
 
     else
 
-        show_msg_box "INFO BOX" "Wrong new value was entered!"
-        ReadRegister
+        show_msg_box "ERROR" "Wrong new value was entered!"
+        #ReadRegister
     fi
 
     cat $TMP_FILE >>$LOG_FILE
@@ -512,12 +517,12 @@ QuickScan() {
             sleep 0.01
         done
     ) |
-        dialog --title "QUICK SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
+        $DIALOG --title "QUICK SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
-    dialog --title "QUICK SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Return to main menu" --textbox $TMP_FILE 30 120
-    clear
-    ReadCommunicationSettings
-    MainMenu
+    $DIALOG --title "QUICK SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    # clear
+    # ReadCommunicationSettings
+    # MainMenu
 }
 CompleteScan() {
     local a
@@ -565,16 +570,17 @@ CompleteScan() {
         done
 
     ) |
-        dialog --title "COMPLETE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
+        $DIALOG --title "COMPLETE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
-    dialog --title "COMPLETE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
-    clear
-    MainMenu
+    $DIALOG --title "COMPLETE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    # clear
+    # MainMenu
 }
 
 fw_update_menu() {
-    ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FW UPDATE" \
-        --menu "\n Current communication settings: \n\
+    while [ 1 ]; do
+        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FW UPDATE" \
+            --menu "\n Current communication settings: \n\
             \n\
     Port: $COM_PORT \n\
     Baudrate: $BAUDRATE \n\
@@ -585,31 +591,25 @@ fw_update_menu() {
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
     Chose action to do" 25 120 8 \
-        "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
-        "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
-        "Update FW of all devices" "Update firmwares of all devices configured in controller at port $COM_PORT from Internet" \
-        "Update FW using file" "FW of device with address $MB_ADDRESS at port $COM_PORT will be updated using FW file" 2>$TMP_FILE
+            "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
+            "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
+            "Update FW of all devices" "Update firmwares of all devices configured in controller at port $COM_PORT from Internet" \
+            "Update FW using file" "FW of device with address $MB_ADDRESS at port $COM_PORT will be updated using FW file" 2>$TMP_FILE
 
-    case $? in
-    0)
-        case $(cat $TMP_FILE) in
-        "Device FW update") update_device_fw_from_internet ;;
-        "Force device FW update") update_device_fw_from_internet "--force" ;;
-        "Update FW of all devices") update_all_devices_fw_from_internet ;;
-        "Update FW using file") update_fw_using_file ;;
+        case $? in
+        0)
+            case $(cat $TMP_FILE) in
+            "Device FW update") update_device_fw_from_internet ;;
+            "Force device FW update") update_device_fw_from_internet "--force" ;;
+            "Update FW of all devices") update_all_devices_fw_from_internet ;;
+            "Update FW using file") update_fw_using_file ;;
+            esac
+            ;;
+        *) return ;;
+        2) show_msg_box "INFO" "Help information about firmware update options" ;;
 
-        3) MainMenu ;;
         esac
-        ;;
-    2)
-        show_msg_box "INFO" "Help information about firmware update options"
-        fw_update_menu
-        ;;
-
-    \
-        *) MainMenu ;;
-
-    esac
+    done
 
 }
 
@@ -644,16 +644,16 @@ update_device_fw_from_internet() {
         # while [ 1 ]; do
         #echo "" >$TMP_FILE
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 120
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 25 120
 
         case $? in
         # 0) echo "0" ;;
-        0) fw_update_menu ;;
-        2) MainMenu ;;
+        0) return ;;
+            #2) MainMenu ;;
         esac
         ;;
 
-    3) fw_update_menu ;;
+    3) return ;;
         # 2) MainMenu ;;
     esac
 
@@ -663,74 +663,88 @@ update_device_fw_from_internet() {
 }
 
 update_all_devices_fw_from_internet() {
-    show_yes_no_dialog "WARNING!!!" "Are yous sure to update firmwares of ALL DEVICES configured in controller?"
+    show_yes_no_dialog "WARNING" \
+        "   Are yous sure to update firmwares of \n  \
+                  ALL DEVICES\n \
+             configured in controller?"
     case $? in
     0)
-        echo -e "Update FW of all devicess configured in controller at port $COM_PORT\n" >$TMP_FILE
-        echo -e $(wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]/\\n/g' -e 's/\[......//g' -e 's/\[..//g') >>$TMP_FILE
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 120
+        echo -e "\nUpdate FW of all devicess configured in controller at port $COM_PORT\n" >$TMP_FILE
+        #echo -e $(wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10./\\n/g') >>$TMP_FILE
+        wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' >>$TMP_FILE
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 30 150
 
         case $? in
         # 0) echo "0" ;;
-        0) fw_update_menu ;;
-        2) MainMenu ;;
+        0) return ;;
+            #2) MainMenu ;;
         esac
         ;;
 
-    *) fw_update_menu ;;
+    *) return ;;
     esac
 
 }
 
 update_fw_using_file() {
-    exho "update_fw_using_file"
+    #echo "update_fw_using_file"
     local window_title="DEVICE FW UPDATE USING FILE"
 
-    echo -e "Device info before FW update:\n" >$TMP_FILE
-    clear
+    #echo -e "Device info before FW update:\n" >$TMP_FILE
+
     read_device_info
+
     echo -e "--------------------------------------\n" >>$TMP_FILE
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Select FW file" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
+    while [ 1 ]; do
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Select FW file" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
-    case $? in
-    0)
-        local fw_file=$($DIALOG --stdout --title "$window_title" --fselect /root/vda/firmwares 14 100)
-        if [[ -f $fw_file && -n $(echo $fw_file | grep ".wbfw") ]]; then
-            echo "Firmware file:" $fw_file >>$TMP_FILE
-            #sleep 5
-            #echo -e "\nFirmware " >>$TMP_FILE
-            $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Start" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
-            case $? in
-            0)
+        case $? in
+        0)
+            local fw_file=$($DIALOG --stdout --title "$window_title" --fselect /root/vda/firmwares 14 100)
+            if [[ -f $fw_file && -n $(echo $fw_file | grep ".wbfw") ]]; then
+                echo "Firmware file:" $fw_file >>$TMP_FILE
+                #sleep 5
+                #echo -e "\nFirmware " >>$TMP_FILE
+                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Start" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
+                case $? in
+                0)
 
-                wb-mcu-fw-flasher -d $COM_PORT -a$MB_ADDRESS -j -f $fw_file >>$TMP_FILE
-                #echo "Firmware done" >>$TMP_FILE
-                ;;
-            *) fw_update_menu ;;
+                    wb-mcu-fw-flasher -d $COM_PORT -a$MB_ADDRESS -j -f $fw_file 2>&1 >>$TMP_FILE
+                    #reboot_device
+                    #echo "Firmware done" >>$TMP_FILE
+                    ;;
+                *) return ;;
 
-            esac
-            echo -e "\n--------------------------------------" >>$TMP_FILE
-            echo -e "Device info after FW update:\n" >>$TMP_FILE
-            read_device_info
+                esac
+                sleep 1
+                echo -e "\n--------------------------------------" >>$TMP_FILE
+                echo -e "Device info after FW update:\n" >>$TMP_FILE
+                local tmp_info=$(cat $TMP_FILE)
+                read_device_info
 
-            $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 28 120
+                #echo "$tmp_info" | cat - $TMP_FILE >$TMP_FILE
+                #sed -i $tmp_info $TMP_FILE
+                echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
+                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 30 120
+                return
+            else
+                show_msg_box "ERROR" "File with firmware was no found!"
 
-        else
-            show_msg_box "ERROR" "File with firmware was no found!"
-            update_fw_using_file
-        fi
-        fw_update_menu
-        ;;
+            fi
 
-    3) fw_update_menu ;;
+            ;;
 
-    esac
+        3) return ;;
 
+        esac
+    done
 }
 
 MainMenu() {
-    ${DIALOG} --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "WB MB EXPLORER" \
-        --menu "\n Current communication settings: \n\
+
+    while [ 1 ]; do
+        ${DIALOG} --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
+            --menu "\n Current communication settings: \n\
     \n\
     Port: $COM_PORT \n\
     Baudrate: $BAUDRATE \n\
@@ -742,38 +756,40 @@ MainMenu() {
     \n\n\
      
         Chose action to do" 25 100 8 \
-        "1 Settings" "set communication settings" \
-        "2 Read device info" "read information about device" \
-        "3 Read/write register" "read register using current settings" \
-        "4 Quick device scan" "scan network using current settings (about 2 min)" \
-        "5 Complete device scan" "scan network using all settings combinations (about 60 min)" \
-        "6 FW update" "Device firmware update" 2>$TMP_FILE
+            "1 Settings" "set communication settings" \
+            "2 Read device info" "read information about device" \
+            "3 Read/write register" "read register using current settings" \
+            "4 Quick device scan" "scan network using current settings (about 2 min)" \
+            "5 Complete device scan" "scan network using all settings combinations (about 60 min)" \
+            "6 FW update" "Device firmware update" 2>$TMP_FILE
 
-    case $? in
-    0) #InfoDialog `cat ${TMP_FILE}`
-        #choice=`cat ${TMP_FILE}`;
-        #
+        case $? in
+        0) #InfoDialog `cat ${TMP_FILE}`
+            #choice=`cat ${TMP_FILE}`;
+            #
 
-        case $(cat $TMP_FILE) in
-        "1 Settings") SetCommunicationSettings ;;
-        "2 Read device info") show_device_info ;;
-        "3 Read/write register") ReadRegister ;;
-        "4 Quick device scan") QuickScan ;;
-        "5 Complete device scan") CompleteScan ;;
-        "6 FW update") fw_update_menu ;;
-        *) MainMenu ;;
+            case $(cat $TMP_FILE) in
+            "1 Settings") SetCommunicationSettings ;;
+            "2 Read device info") show_device_info ;;
+            "3 Read/write register") ReadRegister ;;
+            "4 Quick device scan") QuickScan ;;
+            "5 Complete device scan") CompleteScan ;;
+            "6 FW update") fw_update_menu ;;
+            *) MainMenu ;;
+            esac
+            #CompleteScan
+            #InfoDialog `cat ${TMP_FILE}`
+
+            #MainMenu
+            ;;
+        *)
+
+            show_exit_dialog "Are you sure to exit?"
+
+            ;;
         esac
-        #CompleteScan
-        #InfoDialog `cat ${TMP_FILE}`
 
-        #MainMenu
-        ;;
-    1 | 255)
-
-        ExitDialog "Are you sure to exit?"
-
-        ;;
-    esac
+    done
 }
 
 stopSerialDriver() {
