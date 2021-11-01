@@ -3,11 +3,11 @@
 SCRIPT_DIR="/root/wb-mb-explorer"
 SETTINGS_FILE="$SCRIPT_DIR/wb-mb-explorer.conf"
 LOG_FILE="$SCRIPT_DIR/wb-mb-explorer.log"
-DIALOG=${DIALOG=dialog}
+DIALOG="dialog"
 DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for exploring Modbus network and configuring Wirenboard devices")
 
-TMP_FILE=$(mktemp /tmp/bkp.XXXXXX)
-trap "rm -f $TMP_FILE" 0 1 2 5 15
+TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
+trap "rm -f $TMP_FILE" 0 1 2 5 9 15
 
 # exit confirmation window
 show_exit_dialog() {
@@ -283,24 +283,6 @@ modbusReadText() {
     echo -e $(modbusReadRaw $1 $2 $3 $4 | grep Data | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g') | tr -d "\0"
 }
 
-show_device_info() {
-    while [ 1 ]; do
-        stopSerialDriver
-        echo "" >$TMP_FILE
-        read_device_info
-        #sleep 2
-
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
-
-        case $? in
-        0) continue ;;
-        3) return ;;
-            # 2) MainMenu ;;
-        esac
-    done
-
-}
-
 read_device_info() {
     echo "Reading info from device using following communication settings:" >$TMP_FILE
     echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
@@ -339,6 +321,32 @@ read_device_info() {
         echo -e "\nError: device with current settings is unavailable!" >>$TMP_FILE
         echo -e "\nCheck communication settings and device connection." >>$TMP_FILE
     fi
+}
+
+show_device_info() {
+
+    while [ 1 ]; do
+        stopSerialDriver
+        #echo -e "\n$(date +"%Y-%m-%d %H:%M:%S") +++ Show device info" >>$LOG_FILE
+        write_log "+++ Show device info"
+
+        echo "" >$TMP_FILE
+        read_device_info
+        #sleep 2
+
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
+        case $? in
+        0)
+            write_log "$(cat $TMP_FILE)"
+            continue
+            ;;
+        3)
+            write_log "$(cat $TMP_FILE)"
+            return
+            ;;
+        esac
+    done
+
 }
 
 ReadRegister() {
@@ -740,10 +748,14 @@ update_fw_using_file() {
     done
 }
 
+show_log_file() {
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "LOG FILE" --exit-label "OK" --textbox $LOG_FILE 30 120
+}
+
 MainMenu() {
 
     while [ 1 ]; do
-        ${DIALOG} --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
+        $DIALOG --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
             --menu "\n Current communication settings: \n\
     \n\
     Port: $COM_PORT \n\
@@ -755,13 +767,14 @@ MainMenu() {
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
      
-        Chose action to do" 25 100 8 \
+        Chose action to do" 28 100 8 \
             "1 Settings" "set communication settings" \
             "2 Read device info" "read information about device" \
             "3 Read/write register" "read register using current settings" \
             "4 Quick device scan" "scan network using current settings (about 2 min)" \
             "5 Complete device scan" "scan network using all settings combinations (about 60 min)" \
-            "6 FW update" "Device firmware update" 2>$TMP_FILE
+            "6 FW update" "Device firmware update" \
+            "7 Show log file" "Show log file of current session" 2>$TMP_FILE
 
         case $? in
         0) #InfoDialog `cat ${TMP_FILE}`
@@ -775,6 +788,7 @@ MainMenu() {
             "4 Quick device scan") QuickScan ;;
             "5 Complete device scan") CompleteScan ;;
             "6 FW update") fw_update_menu ;;
+            "7 Show log file") show_log_file ;;
             *) MainMenu ;;
             esac
             #CompleteScan
@@ -805,10 +819,14 @@ stopSerialDriver() {
     #sleep 2
 }
 
+write_log() {
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S") $1\n" >>$LOG_FILE
+}
+
 clear
 
 #Clear log file
-echo "" >$LOG_FILE
+echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
 #Stop driver wb-mqtt-serial
 stopSerialDriver
 
