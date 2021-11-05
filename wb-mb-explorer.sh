@@ -3,11 +3,11 @@
 SCRIPT_DIR="/root/wb-mb-explorer"
 SETTINGS_FILE="$SCRIPT_DIR/wb-mb-explorer.conf"
 LOG_FILE="$SCRIPT_DIR/wb-mb-explorer.log"
-DIALOG=${DIALOG=dialog}
+DIALOG="dialog"
 DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for exploring Modbus network and configuring Wirenboard devices")
 
-TMP_FILE=$(mktemp /tmp/bkp.XXXXXX)
-trap "rm -f $TMP_FILE" 0 1 2 5 15
+TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
+trap "rm -f $TMP_FILE" 0 1 2 5 9 15
 
 # exit confirmation window
 show_exit_dialog() {
@@ -283,24 +283,6 @@ modbusReadText() {
     echo -e $(modbusReadRaw $1 $2 $3 $4 | grep Data | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g') | tr -d "\0"
 }
 
-show_device_info() {
-    while [ 1 ]; do
-        stopSerialDriver
-        echo "" >$TMP_FILE
-        read_device_info
-        #sleep 2
-
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
-
-        case $? in
-        0) continue ;;
-        3) return ;;
-            # 2) MainMenu ;;
-        esac
-    done
-
-}
-
 read_device_info() {
     echo "Reading info from device using following communication settings:" >$TMP_FILE
     echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
@@ -341,8 +323,33 @@ read_device_info() {
     fi
 }
 
+show_device_info() {
+
+    while [ 1 ]; do
+        stopSerialDriver
+        #echo -e "\n$(date +"%Y-%m-%d %H:%M:%S") +++++ Show device info" >>$LOG_FILE
+        write_log "+++++ SHOW DEVICE INFO"
+
+        echo "" >$TMP_FILE
+        read_device_info
+        #sleep 2
+
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "SHOW DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
+        local dialog_button=$?
+
+        write_log "$(cat $TMP_FILE)"
+
+        case $dialog_button in
+        0) continue ;;
+        *) return ;;
+        esac
+
+    done
+
+}
+
 ReadRegister() {
-    stopSerialDriver
+
     # #for test
     # readResult=$(modbusReadHexValue $MB_ADDRESS 3 1280 1)
     # echo -e "*readResult=$readResult"
@@ -353,6 +360,10 @@ ReadRegister() {
     #cat << EOF > $TMP_FILE;
 
     while [ 1 ]; do
+
+        stopSerialDriver
+        write_log "+++++ READ REGISTER"
+
         echo "" >$TMP_FILE
         echo "Reading from device using following communication settings:" >>$TMP_FILE
         echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
@@ -403,8 +414,11 @@ ReadRegister() {
         # fi
 
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ REGISTER" --ok-label "Read register again" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 90 # echo "start dialog" > $TMP_FILE
+        local dialog_button=$?
 
-        case $? in
+        write_log "$(cat $TMP_FILE)"
+
+        case $dialog_button in
         0) continue ;;
         3) WriteRegister ;;
         *) return ;;
@@ -416,6 +430,7 @@ ReadRegister() {
 
 WriteRegister() {
     stopSerialDriver
+    write_log "+++++ WRITE REGISTER"
     #ReadRegister
 
     # while [ 1 ]; do
@@ -474,7 +489,7 @@ WriteRegister() {
         #ReadRegister
     fi
 
-    cat $TMP_FILE >>$LOG_FILE
+    write_log "$(cat $TMP_FILE)"
 
     #     ;;
 
@@ -489,6 +504,8 @@ QuickScan() {
     local progress=0
 
     stopSerialDriver
+
+    write_log "+++++ QUICK SCAN"
 
     echo "Scan results (quick scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
     echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
@@ -520,6 +537,8 @@ QuickScan() {
         $DIALOG --title "QUICK SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
     $DIALOG --title "QUICK SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+
+    write_log "$(cat $TMP_FILE)"
     # clear
     # ReadCommunicationSettings
     # MainMenu
@@ -534,6 +553,8 @@ CompleteScan() {
     local progress=0
 
     stopSerialDriver
+
+    write_log "+++++ COMPLETE SCAN"
 
     echo "Scan results (complete scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
     echo "Port = $COM_PORT" >>$TMP_FILE
@@ -573,6 +594,8 @@ CompleteScan() {
         $DIALOG --title "COMPLETE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
     $DIALOG --title "COMPLETE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+
+    write_log "$(cat $TMP_FILE)"
     # clear
     # MainMenu
 }
@@ -622,6 +645,8 @@ update_device_fw_from_internet() {
         button_title="Force firmware update"
     fi
 
+    write_log "+++++ $window_title"
+
     echo -e "Device info before "${1##--} "FW update:\n" >$TMP_FILE
     clear
     read_device_info
@@ -645,8 +670,11 @@ update_device_fw_from_internet() {
         #echo "" >$TMP_FILE
 
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 25 120
+        local dialog_button=$?
 
-        case $? in
+        write_log "$(cat $TMP_FILE)"
+
+        case $dialog_button in
         # 0) echo "0" ;;
         0) return ;;
             #2) MainMenu ;;
@@ -669,12 +697,16 @@ update_all_devices_fw_from_internet() {
              configured in controller?"
     case $? in
     0)
+        write_log "+++++ ALL DEVICES FW UPDATE"
         echo -e "\nUpdate FW of all devicess configured in controller at port $COM_PORT\n" >$TMP_FILE
         #echo -e $(wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10./\\n/g') >>$TMP_FILE
         wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' >>$TMP_FILE
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 30 150
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
+        local dialog_button=$?
 
-        case $? in
+        write_log "$(cat $TMP_FILE)"
+
+        case $dialog_button in
         # 0) echo "0" ;;
         0) return ;;
             #2) MainMenu ;;
@@ -690,6 +722,7 @@ update_fw_using_file() {
     #echo "update_fw_using_file"
     local window_title="DEVICE FW UPDATE USING FILE"
 
+    write_log "+++++ $window_title"
     #echo -e "Device info before FW update:\n" >$TMP_FILE
 
     read_device_info
@@ -726,6 +759,7 @@ update_fw_using_file() {
                 #sed -i $tmp_info $TMP_FILE
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
                 $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 30 120
+                write_log "$(cat $TMP_FILE)"
                 return
             else
                 show_msg_box "ERROR" "File with firmware was no found!"
@@ -740,10 +774,14 @@ update_fw_using_file() {
     done
 }
 
+show_log_file() {
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "LOG FILE" --exit-label "OK" --textbox $LOG_FILE 32 150
+}
+
 MainMenu() {
 
     while [ 1 ]; do
-        ${DIALOG} --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
+        $DIALOG --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
             --menu "\n Current communication settings: \n\
     \n\
     Port: $COM_PORT \n\
@@ -755,13 +793,14 @@ MainMenu() {
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
      
-        Chose action to do" 25 100 8 \
+        Chose action to do" 28 100 8 \
             "1 Settings" "set communication settings" \
-            "2 Read device info" "read information about device" \
+            "2 Show device info" "read information about device" \
             "3 Read/write register" "read register using current settings" \
             "4 Quick device scan" "scan network using current settings (about 2 min)" \
             "5 Complete device scan" "scan network using all settings combinations (about 60 min)" \
-            "6 FW update" "Device firmware update" 2>$TMP_FILE
+            "6 FW update" "Device firmware update" \
+            "7 Show log file" "Show log file of current session" 2>$TMP_FILE
 
         case $? in
         0) #InfoDialog `cat ${TMP_FILE}`
@@ -770,11 +809,12 @@ MainMenu() {
 
             case $(cat $TMP_FILE) in
             "1 Settings") SetCommunicationSettings ;;
-            "2 Read device info") show_device_info ;;
+            "2 Show device info") show_device_info ;;
             "3 Read/write register") ReadRegister ;;
             "4 Quick device scan") QuickScan ;;
             "5 Complete device scan") CompleteScan ;;
             "6 FW update") fw_update_menu ;;
+            "7 Show log file") show_log_file ;;
             *) MainMenu ;;
             esac
             #CompleteScan
@@ -805,10 +845,14 @@ stopSerialDriver() {
     #sleep 2
 }
 
+write_log() {
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S") $1\n" >>$LOG_FILE
+}
+
 clear
 
 #Clear log file
-echo "" >$LOG_FILE
+echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
 #Stop driver wb-mqtt-serial
 stopSerialDriver
 
