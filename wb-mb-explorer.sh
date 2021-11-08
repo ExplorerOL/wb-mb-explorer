@@ -45,10 +45,6 @@ show_yes_no_dialog() {
     $DIALOG --title "$1" --yesno "\n    $2" 15 61
 }
 
-# reboot_device() {
-#     modbus_client -mrtu $COM_PORT --debug -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t6 -r120 1 2>&1
-# }
-
 read_communication_settings() {
     if [[ -f $SETTINGS_FILE ]]; then
         COM_PORT=$(cat $SETTINGS_FILE | grep COM_PORT | sed -e 's/COM_PORT://')
@@ -62,9 +58,7 @@ read_communication_settings() {
     else
 
         $DIALOG --sleep 2 --title "INFO" --infobox "Configuration file not found! Default settings applied" 10 52
-        #mkdir $SCRIPT_DIR
         mkdir /root/wb-mb-explorer
-        #touch $SETTINGS_FILE
         touch /root/wb-mb-explorer/wb-mb-explorer.conf
         COM_PORT=/dev/ttyRS485-1
         BAUDRATE=9600
@@ -73,6 +67,8 @@ read_communication_settings() {
         MB_ADDRESS=1
         MB_REGISTER=128
         MB_REG_TYPE=holding
+
+        save_communication_settings
 
     fi
 }
@@ -120,20 +116,17 @@ set_communication_settings() {
         "Set Modbus register") set_mb_register ;;
         "Set register type") set_mb_register_type ;;
         esac ;;
-        1)
+        $DIALOG_CANCEL)
             save_communication_settings
             return
             ;;
         *) return ;;
         esac
     done
-    #main_menu
-
 }
 
 set_com_port() {
     COM_PORT=$($DIALOG --stdout --title "Please choose a port to use" --fselect /dev/ttyRS485 14 100)
-    #set_communication_settings
 }
 
 set_baudrate() {
@@ -147,38 +140,36 @@ set_baudrate() {
         "115200" "bit/s" off 2>$TMP_FILE
 
     case $? in
-    $DIALOG_OK) case $(cat ${TMP_FILE}) in
-    "1200") BAUDRATE="1200" ;;
-    "4800") BAUDRATE="4800" ;;
-    "9600") BAUDRATE="9600" ;;
-    "19200") BAUDRATE="19200" ;;
-    "38400") BAUDRATE="38400" ;;
-    "57600") BAUDRATE="57600" ;;
-    "115200") BAUDRATE="115200" ;;
-    esac ;;
-        #1 | 255) main_menu ;;
+    $DIALOG_OK)
+        case $(cat ${TMP_FILE}) in
+        "1200") BAUDRATE="1200" ;;
+        "4800") BAUDRATE="4800" ;;
+        "9600") BAUDRATE="9600" ;;
+        "19200") BAUDRATE="19200" ;;
+        "38400") BAUDRATE="38400" ;;
+        "57600") BAUDRATE="57600" ;;
+        "115200") BAUDRATE="115200" ;;
+        esac
+        ;;
     esac
 
-    #set_communication_settings
 }
 
 set_parity() {
-    #logger -s "mbexplorer setparity"
     $DIALOG --title "Parity" --radiolist "Choose avaliable option for parity:" 20 61 5 \
         "N" "None" ON \
         "E" "Even" off \
         "O" "Odd" off 2>$TMP_FILE
 
     case $? in
-    $DIALOG_OK) case $(cat ${TMP_FILE}) in
-    "N") PARITY="none" ;;
-    "E") PARITY="even" ;;
-    "O") PARITY="odd" ;;
-    esac ;;
-        # 1 | 255) main_menu ;;
+    $DIALOG_OK)
+        case $(cat ${TMP_FILE}) in
+        "N") PARITY="none" ;;
+        "E") PARITY="even" ;;
+        "O") PARITY="odd" ;;
+        esac
+        ;;
     esac
-
-    #set_communication_settings
 }
 
 set_stopbits() {
@@ -187,45 +178,30 @@ set_stopbits() {
         "2" "2 stop bits" ON 2>$TMP_FILE
 
     case $? in
-    $DIALOG_OK) case $(cat ${TMP_FILE}) in
-    "1") STOPBITS="1" ;;
-    "2") STOPBITS="2" ;;
-    esac ;;
-        # 1 | 255) main_menu ;;
+    $DIALOG_OK)
+        case $(cat ${TMP_FILE}) in
+        "1") STOPBITS="1" ;;
+        "2") STOPBITS="2" ;;
+        esac
+        ;;
     esac
 
-    #set_communication_settings
 }
 
 set_address() {
-    # #Creating address list
-    # echo "1 address on" >$TMP_FILE
-    # for i in {2..246}; do
-    #     echo "$i address off" >>$TMP_FILE
-    # done
-    # echo "247 address off" >>$TMP_FILE
-
     $DIALOG --title "Enter address of Modbus device" --inputbox "Enter address of Modbus device you wnat to work with (from 1 to 247)" 16 51 2>$TMP_FILE
 
     case $? in
     $DIALOG_OK)
         value=$(cat ${TMP_FILE})
-        #echo $value
-        #sleep 3
         if [[ ($value -ge 0) && ($value -le 248) && ($value%1 -eq 0) && ($value -ne "") ]]; then
             MB_ADDRESS=$value
         else
-            #echo "else"
             show_msg_box "INFO" "Entered device address is incorrect!"
-            #$DIALOG --sleep 2 --title "INFO" --infobox "Entered device address is incorrect!" 10 52
-            #$DIALOG --title "INFO" --msgbox "Entered device address is incorrect!" 10 52
-            #set_address
         fi
         ;;
-        # 1 | 255) main_menu ;;
-    esac
 
-    #set_communication_settings
+    esac
 }
 
 set_mb_register() {
@@ -239,8 +215,6 @@ set_mb_register() {
         $DIALOG --sleep 2 --title "INFO" --infobox "Wrong address was entered!" 10 52
     fi ;;
     esac
-    #set_communication_settings
-
 }
 
 set_mb_register_type() {
@@ -253,19 +227,13 @@ set_mb_register_type() {
     case $? in
     $DIALOG_OK) MB_REG_TYPE=$(cat ${TMP_FILE}) ;;
     esac
-
-    #set_communication_settings
 }
 
 modbus_read_raw() {
-
-    # read_result_raw=$(modbus_client --debug -mrtu $COM_PORT -o100 -a$1 -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$2 -r$3 -c$4 2>&1)
-    # echo $read_result_raw
     modbus_client --debug -mrtu $COM_PORT -o100 -a$1 -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$2 -r$3 -c$4 2>&1
 }
 
 modbus_write() {
-    #echo $(modbus_client -mrtu -pnone -s2 $COM_PORT -a$MB_ADDRESS -t0x03 -r$R -c$C | grep Data | sed 's/.*Data://' | sed 's/ //g')
     modbus_client -mrtu $COM_PORT --debug -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $1 2>&1
 }
 
@@ -283,17 +251,11 @@ modbus_read_hex_value() {
 }
 
 value_hex_to_dec() {
-    #echo $((16#$(echo $1 | sed 's/0x//g')))
-    #echo $((0xff))
-
     if [[ "$1" = "0x0000" ]]; then
         echo "0"
     else
-        #local clearHexVal=$(echo $1 | sed 's/0x
         echo $((16#$1))
     fi
-
-    # echo $((16#$1))
 }
 
 modbus_read_text() {
@@ -345,13 +307,11 @@ show_device_info() {
 
     while [ 1 ]; do
         stop_serial_driver
-        #echo -e "\n$(date +"%Y-%m-%d %H:%M:%S") +++++ Show device info" >>$LOG_FILE
+
         write_log "+++++ SHOW DEVICE INFO"
 
         echo "" >$TMP_FILE
         read_device_info
-        #sleep 2
-
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "SHOW DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
         local dialog_button=$?
 
@@ -367,15 +327,6 @@ show_device_info() {
 }
 
 read_register() {
-
-    # #for test
-    # readResult=$(modbus_read_hex_value $MB_ADDRESS 3 1280 1)
-    # echo -e "*readResult=$readResult"
-    # #echo "*readRawResult="$readRawResult""
-    # exit
-    # ############
-
-    #cat << EOF > $TMP_FILE;
 
     while [ 1 ]; do
 
@@ -396,40 +347,18 @@ read_register() {
         "input") MBFunction="0x04" ;;
         esac
 
-        #modbus_client $COM_PORT $MB_ADDRESS $BAUDRATE $STOPBITS $PARITY $MBFunction $MB_REGISTER >>$TMP_FILE
         local readResult=$(modbus_read_hex_value $MB_ADDRESS $MBFunction $MB_REGISTER 1)
-        #echo "hello $readRawResult2"
-        #echo $readResult
 
         if [[ -z $(echo $readResult | grep ERROR) ]]; then
-            #echo "*SUCCESS $readResult"
             echo "Read data (hex): 0x$readResult" >>$TMP_FILE
             readResult=$(value_hex_to_dec $readResult)
             echo "Read data (dec): $readResult" >>$TMP_FILE
 
         else
-            # echo "*ERROR $readResult"
             echo "Error reading register $MB_REGISTER" >>$TMP_FILE
             echo "" >>$TMP_FILE
             echo "$readResult" >>$TMP_FILE
-
-            #echo "hello $readRawResult2" >>$TMP_FILE
-            #sleep 2
-            #readResult=$(modbus_read_hex_value $readResult)
-            #readResult=$(echo $((16#$readResult)))
-            #readResult=$(echo $readResult | sed 's/)
-
-            #echo "Reg data (dec): $((echo 16#$(echo $readResult | sed 's/0x//g')))) " >>$TMP_FILE
         fi
-
-        # readResult=$(modbusRead)
-        # echo $readResult
-        # if [[ $(echo $readResult | grep SUCCESS) ]]; then
-        #     $(echo $readResult | grep Data) >>$TMP_FILE
-        #     #echo $readResult >>$TMP_FILE
-        # else
-        #     echo "Error reading register"
-        # fi
 
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ REGISTER" --ok-label "Read register again" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 90 # echo "start dialog" > $TMP_FILE
         local dialog_button=$?
@@ -438,7 +367,7 @@ read_register() {
 
         case $dialog_button in
         $DIALOG_OK) continue ;;
-        3) write_register ;;
+        $DIALOG_EXTRA) write_register ;;
         *) return ;;
         esac
 
@@ -449,26 +378,7 @@ read_register() {
 write_register() {
     stop_serial_driver
     write_log "+++++ WRITE REGISTER"
-    #read_register
 
-    # while [ 1 ]; do
-    #     echo "Writing register with address $MB_ADDRESS using following communication settings:" >$TMP_FILE
-    #     echo "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS" >>$TMP_FILE
-    #     echo "Modbus register: $MB_REGISTER, Register type: $MB_REG_TYPE" >>$TMP_FILE
-
-    #     #REading selected register first
-    #     case $MB_REG_TYPE in
-    #     "coil") MBFunction="0x01" ;;
-    #     "descrete") MBFunction="0x02" ;;
-    #     "holding") MBFunction="0x03" ;;
-    #     "input") MBFunction="0x04" ;;
-    #     esac
-    #     CurrentRegValue =`modbus_client -mrtu $COM_PORT --debug -o 300 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER | grep Data | sed -e 's/Data://'`
-    #     echo "Current register value: "$CurrentRegValue >> $TMP_FILE
-    #     dialog --title "MBEXPLORER WRITE ADDRESS" --help-button --exit-label "Write register" --help-label "Return to main menu" --textbox $TMP_FILE 80 100
-    #         case $? in
-    #         2 | 255) break ;;
-    #         esac
     case $MB_REG_TYPE in
     "coil") MBFunction="0x05" ;;
     "holding") MBFunction="0x06" ;;
@@ -481,14 +391,9 @@ write_register() {
     esac
 
     $DIALOG --title "WRITE REGISTER" --inputbox "Enter new register value in decimal (100) or hex (0x64)" 16 51 2>$TMP_FILE
-    # clear
-    # cat $TMP_FILE
-    # sleep 3
-    # case $? in
-    # 0)
+
     local input_value="$(cat $TMP_FILE)"
-    # echo $input_value
-    # sleep 5
+
     if [[ "$input_value" -ge "0" && "$input_value" -le "65535" && -n "$input_value" ]]; then
         local writeResult=$(modbus_write $input_value)
 
@@ -504,15 +409,10 @@ write_register() {
     else
 
         show_msg_box "ERROR" "Wrong new value was entered!"
-        #read_register
+
     fi
 
     write_log "$(cat $TMP_FILE)"
-
-    #     ;;
-
-    # esac
-
 }
 
 quick_scan() {
@@ -557,9 +457,6 @@ quick_scan() {
     $DIALOG --title "QUICK SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
 
     write_log "$(cat $TMP_FILE)"
-    # clear
-    # read_communication_settings
-    # main_menu
 }
 complete_scan() {
     local a
@@ -614,8 +511,6 @@ complete_scan() {
     $DIALOG --title "COMPLETE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
 
     write_log "$(cat $TMP_FILE)"
-    # clear
-    # main_menu
 }
 
 fw_update_menu() {
@@ -646,9 +541,15 @@ fw_update_menu() {
             "Update FW using file") update_fw_using_file ;;
             esac
             ;;
+        $DIALOG_HELP)
+            show_help "HELP" "\n                    FW UPDATE help \n\n
+        1 Device FW update - updates FW of device with current communication settings.\n
+                             The newest version of firmware is downloaded from internet automatically\n
+        2 Force device FW update - like item 1, but reflashes device even it already has the newest FW version\n
+        3 Update FW of all devices - like item 1, but for ALL devices configured in Wirenboard controller\n
+        4 Update FW using file - updates FW of device with current communication settings using specified FW file\n"
+            ;;
         *) return ;;
-        2) show_msg_box "INFO" "Help information about firmware update options" ;;
-
         esac
     done
 
@@ -674,18 +575,12 @@ update_device_fw_from_internet() {
 
     case $? in
     $DIALOG_OK)
-        #echo "$(wb-mcu-fw-updater update-fw -a$MB_ADDRESS $COM_PORT)" | sed -e 's/[[:cntrl:]]//g' -e 's/\[......//g' -e 's/\[..//g' >>$TMP_FILE
+
         wb-mcu-fw-updater update-fw -a$MB_ADDRESS $COM_PORT $1 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[......//g' -e 's/\[..//g' >>$TMP_FILE
-        #cat $TMP_FILE >$LOG_FILE
 
         if [[ -z $(cat $TMP_FILE | grep Done) ]]; then
             echo -e "\nError updating firmware: device with address $MB_ADDRESS is unavaliable!" >$TMP_FILE
         fi
-        #wb-mcu-fw-updater update-fw -a"$MB_ADDRESS" "$COM_PORT" 2>&1 >>$TMP_FILE
-        # cat $TMP_FILE >$LOG_FILE
-        # cat $LOG_FILE >$TMP_FILE
-        # while [ 1 ]; do
-        #echo "" >$TMP_FILE
 
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 25 120
         local dialog_button=$?
@@ -693,19 +588,13 @@ update_device_fw_from_internet() {
         write_log "$(cat $TMP_FILE)"
 
         case $dialog_button in
-        # 0) echo "0" ;;
         $DIALOG_OK) return ;;
-            #2) main_menu ;;
         esac
         ;;
 
-    3) return ;;
-        # 2) main_menu ;;
+    $DIALOG_EXTRA) return ;;
     esac
 
-    #sleep 1
-
-    #done
 }
 
 update_all_devices_fw_from_internet() {
@@ -717,7 +606,6 @@ update_all_devices_fw_from_internet() {
     $DIALOG_OK)
         write_log "+++++ ALL DEVICES FW UPDATE"
         echo -e "\nUpdate FW of all devicess configured in controller at port $COM_PORT\n" >$TMP_FILE
-        #echo -e $(wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10./\\n/g') >>$TMP_FILE
         wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' >>$TMP_FILE
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
         local dialog_button=$?
@@ -725,9 +613,7 @@ update_all_devices_fw_from_internet() {
         write_log "$(cat $TMP_FILE)"
 
         case $dialog_button in
-        # 0) echo "0" ;;
         $DIALOG_OK) return ;;
-            #2) main_menu ;;
         esac
         ;;
 
@@ -737,11 +623,9 @@ update_all_devices_fw_from_internet() {
 }
 
 update_fw_using_file() {
-    #echo "update_fw_using_file"
     local window_title="DEVICE FW UPDATE USING FILE"
 
     write_log "+++++ $window_title"
-    #echo -e "Device info before FW update:\n" >$TMP_FILE
 
     read_device_info
 
@@ -761,8 +645,6 @@ update_fw_using_file() {
                 $DIALOG_OK)
 
                     wb-mcu-fw-flasher -d $COM_PORT -a$MB_ADDRESS -j -f $fw_file 2>&1 >>$TMP_FILE
-                    #reboot_device
-                    #echo "Firmware done" >>$TMP_FILE
                     ;;
                 *) return ;;
 
@@ -773,8 +655,6 @@ update_fw_using_file() {
                 local tmp_info=$(cat $TMP_FILE)
                 read_device_info
 
-                #echo "$tmp_info" | cat - $TMP_FILE >$TMP_FILE
-                #sed -i $tmp_info $TMP_FILE
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
                 $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 30 120
                 write_log "$(cat $TMP_FILE)"
@@ -783,11 +663,9 @@ update_fw_using_file() {
                 show_msg_box "ERROR" "File with firmware was no found!"
 
             fi
-
             ;;
 
-        3) return ;;
-
+        $DIALOG_EXTRA) return ;;
         esac
     done
 }
@@ -815,16 +693,13 @@ main_menu() {
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
             "3 Read/write register" "read register using current settings" \
-            "4 Quick device scan" "scan network using current settings (about 2 min)" \
-            "5 Complete device scan" "scan network using all settings combinations (about 60 min)" \
+            "4 Quick device scan" "scan network using current settings (about 30 sec)" \
+            "5 Complete device scan" "scan network using all settings combinations (about 1 hour)" \
             "6 FW update" "Device firmware update" \
             "7 Show log file" "Show log file of current session" 2>$TMP_FILE
 
         case $? in
-        $DIALOG_OK) #InfoDialog `cat ${TMP_FILE}`
-            #choice=`cat ${TMP_FILE}`;
-            #
-
+        $DIALOG_OK)
             case $(cat $TMP_FILE) in
             "1 Settings") set_communication_settings ;;
             "2 Show device info") show_device_info ;;
@@ -835,13 +710,23 @@ main_menu() {
             "7 Show log file") show_log_file ;;
             *) main_menu ;;
             esac
-            #complete_scan
-            #InfoDialog `cat ${TMP_FILE}`
-
-            #main_menu
             ;;
-        2)
-            show_help "HELP" "This is a bref user guide of WB-MW-EXPLORER"
+        $DIALOG_HELP)
+            show_help "HELP" "\n                     This is a bref user guide of WB-MW-EXPLORER\n\n
+            1 Settings  -   lets user to choose communication settings, which will be used for communication\n
+                            with a device\n
+            2 Show device info - reads most importand Wirenboard device information (device model, firmware version, etc)\n
+            3 Read/write register - allows user to read and write register of Modbus device using current \n
+                                    communication settings\n
+            4 Quick device scan - scans network for Wirenboard devices with addresses from 1 to 247 using current\n
+                                communication settings\n
+            5 Complete device scan - scans network for Wirenboard devices with addresses from 1 to 247 using all\n
+                                     possible communication settings\n
+            6 FW update - allows to update firmwares of wirenboard devices\n
+            7 Show log file - shows log file of current programm session\n\n
+    To switch between menu itemps use Up and Down keys, for selecting answer buttons use TAB key or Left and Right keys.\n
+    For filenames completion if dialogs with choosing files, please, use SPACE key.\n\n
+    Configuration file and log file are stored in /root/wb-mb-explorer directory.\n"
             ;;
         *)
 
@@ -854,22 +739,18 @@ main_menu() {
 }
 
 stop_serial_driver() {
-    # status=$(systemctl is-active wb-mqtt-serial)
-    # echo $?
-    # echo $status
 
     if [[ "$(systemctl is-active wb-mqtt-serial)" = "active" ]]; then
         echo "Stopping service wb-mqtt-serial"
         systemctl stop wb-mqtt-serial
     fi
-
-    #sleep 2
 }
 
 write_log() {
     echo -e "$(date +"%Y-%m-%d %H:%M:%S") $1\n" >>$LOG_FILE
 }
 
+#start function of script
 main() {
     clear
 
