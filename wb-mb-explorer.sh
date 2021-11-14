@@ -516,7 +516,11 @@ complete_scan() {
 fw_update_menu() {
     while [ 1 ]; do
         ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FW UPDATE" \
-            --menu "\n Current communication settings: \n\
+            --menu "\n                                                   Attention!!! \n\n \
+        These functions are intended for updating firmwares of devices connected via the RS-485 network. \n \
+        Do not do this if you are not sure in correctness of your actions. \n \
+            
+            \n Current communication settings: \n\
             \n\
     Port: $COM_PORT \n\
     Baudrate: $BAUDRATE \n\
@@ -526,7 +530,7 @@ fw_update_menu() {
     Modbus register: $MB_REGISTER \n\
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
-    Chose action to do" 25 120 8 \
+    Chose action to do" 30 120 8 \
             "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
             "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
             "Update FW of all devices" "Update firmwares of all devices configured in controller at port $COM_PORT from Internet" \
@@ -693,7 +697,7 @@ main_menu() {
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
             "3 Read/write register" "read register using current settings" \
-            "4 Quick device scan" "scan network using current settings (about 30 sec)" \
+            "4 Quick device scan" "scan network using current settings (about 1 minute)" \
             "5 Complete device scan" "scan network using all settings combinations (about 1 hour)" \
             "6 FW update" "Device firmware update" \
             "7 Show log file" "Show log file of current session" 2>$TMP_FILE
@@ -712,10 +716,13 @@ main_menu() {
             esac
             ;;
         $DIALOG_HELP)
-            show_help "HELP" "\n                     This is a bref user guide of WB-MW-EXPLORER\n\n
+            show_help "HELP" "\n                                                 This is a bref user guide of WB-MW-EXPLORER\n\n
+            wb-mb-explorer is a tool for easy scan and configure Wirenboard Modbus devices. \n
+            It is a pseudographical cover for modbus_client, wb-mcu-fw-flasher and wb-mcu-fw-updater tools. \n
+            Configuration is stored in /root/wb-mb-explorer.conf file, log of last session is stored in /root/wb-mb-explorer.log file. \n\n
             1 Settings  -   lets user to choose communication settings, which will be used for communication\n
                             with a device\n
-            2 Show device info - reads most importand Wirenboard device information (device model, firmware version, etc)\n
+            2 Show device info - reads most importand Wirenboard device information (device model, firmware version and etc.)\n
             3 Read/write register - allows user to read and write register of Modbus device using current \n
                                     communication settings\n
             4 Quick device scan - scans network for Wirenboard devices with addresses from 1 to 247 using current\n
@@ -724,9 +731,8 @@ main_menu() {
                                      possible communication settings\n
             6 FW update - allows to update firmwares of wirenboard devices\n
             7 Show log file - shows log file of current programm session\n\n
-    To switch between menu itemps use Up and Down keys, for selecting answer buttons use TAB key or Left and Right keys.\n
-    For filenames completion if dialogs with choosing files, please, use SPACE key.\n\n
-    Configuration file and log file are stored in /root/wb-mb-explorer directory.\n"
+    To switch between menu items use Up and Down keys, for selecting answer buttons use TAB key or Left and Right keys.\n
+    For filenames completion in selecting files dialogs use SPACE key."
             ;;
         *)
 
