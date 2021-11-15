@@ -529,7 +529,7 @@ fw_update_menu() {
     while [ 1 ]; do
         ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FW UPDATE" \
             --menu "\n                                                   Attention!!! \n\n \
-        These functions are intended for updating firmwares of devices connected via the RS-485 network. \n \
+        These functions are intended for updating firmwares of devices connected via RS-485 network. \n \
         Do not do this if you are not sure in correctness of your actions. \n \
             
             \n Current communication settings: \n\
@@ -545,7 +545,7 @@ fw_update_menu() {
     Chose action to do" 30 120 8 \
             "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
             "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
-            "Update FW of all devices" "Update firmwares of all devices configured in controller at port $COM_PORT from Internet" \
+            "Update FW of all devices" "Update FWs of all devices configured in controller at port $COM_PORT from Internet" \
             "Update FW using file" "FW of device with address $MB_ADDRESS at port $COM_PORT will be updated using FW file" 2>$TMP_FILE
 
         case $? in
@@ -586,8 +586,11 @@ update_device_fw_from_internet() {
     clear
     read_device_info
     echo -e "--------------------------------------\n" >>$TMP_FILE
+    echo -e "                                                 Attention!!!\n
+                    Firmware updating process may take up to several minutes.\n
+                    Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
 
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "$button_title" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 20 90
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "$button_title" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
     case $? in
     $DIALOG_OK)
@@ -598,7 +601,7 @@ update_device_fw_from_internet() {
             echo -e "\nError updating firmware: device with address $MB_ADDRESS is unavaliable!" >$TMP_FILE
         fi
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 25 120
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -615,7 +618,13 @@ update_device_fw_from_internet() {
 
 update_all_devices_fw_from_internet() {
     show_yes_no_dialog "WARNING" \
-        "   Are yous sure to update firmwares of \n  \
+        "   
+                      Attention!\n
+Firmware updating process may take up to several minutes.\n
+                Don't interrupt this process!!!\n
+          Otherwise you will damage your devices!!!\n\n        
+
+        Are yous sure to update firmwares of \n  \
                   ALL DEVICES\n \
              configured in controller?"
     case $? in
@@ -646,6 +655,10 @@ update_fw_using_file() {
     read_device_info
 
     echo -e "--------------------------------------\n" >>$TMP_FILE
+    echo -e "                                                 Attention!!!\n
+                    Firmware updating process may take up to several minutes.\n
+                    Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
+
     while [ 1 ]; do
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Select FW file" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
@@ -672,7 +685,7 @@ update_fw_using_file() {
                 read_device_info
 
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
-                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 30 120
+                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 32 150
                 write_log "$(cat $TMP_FILE)"
                 return
             else
