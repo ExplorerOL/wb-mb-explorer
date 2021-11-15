@@ -3,6 +3,7 @@
 SCRIPT_DIR="/root/wb-mb-explorer"
 SETTINGS_FILE="$SCRIPT_DIR/wb-mb-explorer.conf"
 LOG_FILE="$SCRIPT_DIR/wb-mb-explorer.log"
+
 DIALOG="dialog"
 DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for exploring Modbus network and configuring Wirenboard devices")
 DIALOG_OK=0
@@ -16,11 +17,12 @@ SIG_NONE=0
 SIG_HUP=1
 SIG_INT=2
 SIG_QUIT=3
+SIG_TRAP=5
 SIG_KILL=9
 SIG_TERM=15
 
 TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
-trap "rm -f $TMP_FILE" 0 1 2 5 9 15
+trap "rm -f $TMP_FILE" $SIG_NONE $SIG_HUP $SIG_INT $SIG_QUIT $SIG_TRAP $SIG_KILL $SIG_TERM
 
 # exit confirmation window
 show_exit_dialog() {
