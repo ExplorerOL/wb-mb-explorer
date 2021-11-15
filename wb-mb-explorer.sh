@@ -51,6 +51,10 @@ show_yes_no_dialog() {
 }
 
 read_communication_settings() {
+    if [[ ! -d $SCRIPT_DIR ]]; then
+        mkdir $SCRIPT_DIR
+    fi
+
     if [[ -f $SETTINGS_FILE ]]; then
         COM_PORT=$(cat $SETTINGS_FILE | grep COM_PORT | sed -e 's/COM_PORT://')
         BAUDRATE=$(cat $SETTINGS_FILE | grep BAUDRATE | sed -e 's/BAUDRATE://')
@@ -62,9 +66,7 @@ read_communication_settings() {
 
     else
 
-        $DIALOG --sleep 2 --title "INFO" --infobox "Configuration file not found! Default settings applied" 10 52
-        mkdir /root/wb-mb-explorer
-        touch /root/wb-mb-explorer/wb-mb-explorer.conf
+        show_msg_box "INFO" "Configuration file not found! Default settings will be applied"
         COM_PORT=/dev/ttyRS485-1
         BAUDRATE=9600
         PARITY=none
@@ -198,11 +200,11 @@ set_address() {
 
     case $? in
     $DIALOG_OK)
-        value=$(cat ${TMP_FILE})
-        if [[ ($value -ge 0) && ($value -le 248) && ($value%1 -eq 0) && ($value -ne "") ]]; then
+        local value=$(cat ${TMP_FILE})
+        if [[ ("$value" -ge "0") && ("$value" -le "247") && ("$value%1" -eq "0") && ("$value" -ne "") ]]; then
             MB_ADDRESS=$value
         else
-            show_msg_box "INFO" "Entered device address is incorrect!"
+            show_msg_box "ERROR" "Entered device address is incorrect!"
         fi
         ;;
 
@@ -214,11 +216,14 @@ set_mb_register() {
     $DIALOG --title "Enter address of Modbus register" --inputbox "Enter address of Modbus register in decimal or hex (0x12345)" 16 51 2>$TMP_FILE
 
     case $? in
-    $DIALOG_OK) if [[ ($(cat $TMP_FILE) -ge 0) && ($(cat $TMP_FILE) -le 30000) ]]; then
-        MB_REGISTER=$(cat $TMP_FILE)
-    else
-        $DIALOG --sleep 2 --title "INFO" --infobox "Wrong address was entered!" 10 52
-    fi ;;
+    $DIALOG_OK)
+        local value=$(cat ${TMP_FILE})
+        if [[ ("$value" -ge "1") && ("$value" -le "65535") && ("$value" -ne "") ]]; then
+            MB_REGISTER=$(cat $TMP_FILE)
+        else
+            show_msg_box "ERROR" "Entered device register number is incorrect!"
+        fi
+        ;;
     esac
 }
 
@@ -698,7 +703,7 @@ main_menu() {
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
      
-        Chose action to do" 28 100 8 \
+        Choose action to do" 28 100 8 \
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
             "3 Read/write register" "read register using current settings" \
@@ -765,9 +770,6 @@ write_log() {
 main() {
     clear
 
-    #Clear log file
-    echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
-
     #check serial driver for running before starting script
     if [[ "$(systemctl is-active wb-mqtt-serial)" = "active" ]]; then
         serial_driver_was_running=1
@@ -780,6 +782,9 @@ main() {
 
     #Reading current communication settings
     read_communication_settings
+
+    #Clear log file
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
 
     #Show main menu
     main_menu
