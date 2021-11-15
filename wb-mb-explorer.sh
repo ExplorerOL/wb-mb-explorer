@@ -26,8 +26,13 @@ trap "rm -f $TMP_FILE" 0 1 2 5 9 15
 show_exit_dialog() {
     $DIALOG --yesno "\n            $1" 7 50
     case $? in
-    $DIALOG_OK) exit ;;
-        #*) return ;;
+    $DIALOG_OK)
+        if [[ "$serial_driver_was_running" = "1" ]]; then
+            echo "Starting service wb-mqtt-serial"
+            systemctl start wb-mqtt-serial
+        fi
+        exit
+        ;;
     esac
 }
 
@@ -762,6 +767,14 @@ main() {
 
     #Clear log file
     echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
+
+    #check serial driver for running before starting script
+    if [[ "$(systemctl is-active wb-mqtt-serial)" = "active" ]]; then
+        serial_driver_was_running=1
+    else
+        serial_driver_was_running=0
+    fi
+
     #Stop driver wb-mqtt-serial
     stop_serial_driver
 
@@ -770,6 +783,7 @@ main() {
 
     #Show main menu
     main_menu
+
 }
 
 main
