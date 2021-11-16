@@ -276,7 +276,7 @@ modbus_read_text() {
 }
 
 read_device_info() {
-    echo "Reading info from device using following communication settings:" >$TMP_FILE
+    echo -e "\nReading info from device using following communication settings:" >$TMP_FILE
     echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
     echo "----------------------------------------------------------" >>$TMP_FILE
 
@@ -583,7 +583,6 @@ update_device_fw_from_internet() {
     write_log "+++++ $window_title"
 
     echo -e "Device info before "${1##--} "FW update:\n" >$TMP_FILE
-    clear
     read_device_info
     echo -e "--------------------------------------\n" >>$TMP_FILE
     echo -e "                                                 Attention!!!\n
@@ -600,6 +599,14 @@ update_device_fw_from_internet() {
         if [[ -z $(cat $TMP_FILE | grep Done) ]]; then
             echo -e "\nError updating firmware: device with address $MB_ADDRESS is unavaliable!" >$TMP_FILE
         fi
+
+        sleep 1
+        echo -e "\n--------------------------------------" >>$TMP_FILE
+        echo -e "Device info after FW update:\n" >>$TMP_FILE
+        local tmp_info=$(cat $TMP_FILE)
+        read_device_info
+
+        echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
 
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
         local dialog_button=$?
@@ -741,7 +748,7 @@ main_menu() {
             esac
             ;;
         $DIALOG_HELP)
-            show_help "HELP" "\n                                                 This is a bref user guide of WB-MW-EXPLORER\n\n
+            show_help "HELP" "\n                                              This is a short user guide of WB-MW-EXPLORER tool\n\n
             wb-mb-explorer is a tool for easy scan and configure Wirenboard Modbus devices. \n
             It is a pseudographical cover for modbus_client, wb-mcu-fw-flasher and wb-mcu-fw-updater tools. \n
             Configuration is stored in /root/wb-mb-explorer.conf file, log of last session is stored in /root/wb-mb-explorer.log file. \n\n
