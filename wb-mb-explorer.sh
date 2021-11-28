@@ -731,8 +731,8 @@ main_menu() {
             "3 Read/write register" "read register using current settings" \
             "4 Quick device scan" "scan network using current settings (about 1 minute)" \
             "5 Complete device scan" "scan network using all settings combinations (about 1 hour)" \
-            "6 FW update" "Device firmware update" \
-            "7 Show log file" "Show log file of current session" 2>$TMP_FILE
+            "6 FW update" "device firmware update" \
+            "7 Show log file" "show log file of current session" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
