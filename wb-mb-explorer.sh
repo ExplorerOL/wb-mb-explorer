@@ -3,6 +3,7 @@
 SCRIPT_DIR="/root/wb-mb-explorer"
 SETTINGS_FILE="$SCRIPT_DIR/wb-mb-explorer.conf"
 LOG_FILE="$SCRIPT_DIR/wb-mb-explorer.log"
+
 DIALOG="dialog"
 DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for exploring Modbus network and configuring Wirenboard devices")
 DIALOG_OK=0
@@ -16,18 +17,24 @@ SIG_NONE=0
 SIG_HUP=1
 SIG_INT=2
 SIG_QUIT=3
+SIG_TRAP=5
 SIG_KILL=9
 SIG_TERM=15
 
 TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
-trap "rm -f $TMP_FILE" 0 1 2 5 9 15
+trap "rm -f $TMP_FILE" $SIG_NONE $SIG_HUP $SIG_INT $SIG_QUIT $SIG_TRAP $SIG_KILL $SIG_TERM
 
 # exit confirmation window
 show_exit_dialog() {
     $DIALOG --yesno "\n            $1" 7 50
     case $? in
-    $DIALOG_OK) exit ;;
-        #*) return ;;
+    $DIALOG_OK)
+        if [[ "$serial_driver_was_running" = "1" ]]; then
+            echo "Starting service wb-mqtt-serial"
+            systemctl start wb-mqtt-serial
+        fi
+        exit
+        ;;
     esac
 }
 
@@ -46,6 +53,10 @@ show_yes_no_dialog() {
 }
 
 read_communication_settings() {
+    if [[ ! -d $SCRIPT_DIR ]]; then
+        mkdir $SCRIPT_DIR
+    fi
+
     if [[ -f $SETTINGS_FILE ]]; then
         COM_PORT=$(cat $SETTINGS_FILE | grep COM_PORT | sed -e 's/COM_PORT://')
         BAUDRATE=$(cat $SETTINGS_FILE | grep BAUDRATE | sed -e 's/BAUDRATE://')
@@ -57,9 +68,7 @@ read_communication_settings() {
 
     else
 
-        $DIALOG --sleep 2 --title "INFO" --infobox "Configuration file not found! Default settings applied" 10 52
-        mkdir /root/wb-mb-explorer
-        touch /root/wb-mb-explorer/wb-mb-explorer.conf
+        show_msg_box "INFO" "Configuration file not found! Default settings will be applied"
         COM_PORT=/dev/ttyRS485-1
         BAUDRATE=9600
         PARITY=none
@@ -193,11 +202,11 @@ set_address() {
 
     case $? in
     $DIALOG_OK)
-        value=$(cat ${TMP_FILE})
-        if [[ ($value -ge 0) && ($value -le 248) && ($value%1 -eq 0) && ($value -ne "") ]]; then
+        local value=$(cat ${TMP_FILE})
+        if [[ ("$value" -ge "0") && ("$value" -le "247") && ("$value%1" -eq "0") && ("$value" -ne "") ]]; then
             MB_ADDRESS=$value
         else
-            show_msg_box "INFO" "Entered device address is incorrect!"
+            show_msg_box "ERROR" "Entered device address is incorrect!"
         fi
         ;;
 
@@ -209,11 +218,14 @@ set_mb_register() {
     $DIALOG --title "Enter address of Modbus register" --inputbox "Enter address of Modbus register in decimal or hex (0x12345)" 16 51 2>$TMP_FILE
 
     case $? in
-    $DIALOG_OK) if [[ ($(cat $TMP_FILE) -ge 0) && ($(cat $TMP_FILE) -le 30000) ]]; then
-        MB_REGISTER=$(cat $TMP_FILE)
-    else
-        $DIALOG --sleep 2 --title "INFO" --infobox "Wrong address was entered!" 10 52
-    fi ;;
+    $DIALOG_OK)
+        local value=$(cat ${TMP_FILE})
+        if [[ ("$value" -ge "1") && ("$value" -le "65535") && ("$value" -ne "") ]]; then
+            MB_REGISTER=$(cat $TMP_FILE)
+        else
+            show_msg_box "ERROR" "Entered device register number is incorrect!"
+        fi
+        ;;
     esac
 }
 
@@ -264,7 +276,7 @@ modbus_read_text() {
 }
 
 read_device_info() {
-    echo "Reading info from device using following communication settings:" >$TMP_FILE
+    echo -e "\nReading info from device using following communication settings:" >$TMP_FILE
     echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
     echo "----------------------------------------------------------" >>$TMP_FILE
 
@@ -517,7 +529,7 @@ fw_update_menu() {
     while [ 1 ]; do
         ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FW UPDATE" \
             --menu "\n                                                   Attention!!! \n\n \
-        These functions are intended for updating firmwares of devices connected via the RS-485 network. \n \
+        These functions are intended for updating firmwares of devices connected via RS-485 network. \n \
         Do not do this if you are not sure in correctness of your actions. \n \
             
             \n Current communication settings: \n\
@@ -533,7 +545,7 @@ fw_update_menu() {
     Chose action to do" 30 120 8 \
             "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
             "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
-            "Update FW of all devices" "Update firmwares of all devices configured in controller at port $COM_PORT from Internet" \
+            "Update FW of all devices" "Update FWs of all devices configured in controller at port $COM_PORT from Internet" \
             "Update FW using file" "FW of device with address $MB_ADDRESS at port $COM_PORT will be updated using FW file" 2>$TMP_FILE
 
         case $? in
@@ -571,11 +583,13 @@ update_device_fw_from_internet() {
     write_log "+++++ $window_title"
 
     echo -e "Device info before "${1##--} "FW update:\n" >$TMP_FILE
-    clear
     read_device_info
     echo -e "--------------------------------------\n" >>$TMP_FILE
+    echo -e "                                                 Attention!!!\n
+                    Firmware updating process may take up to several minutes.\n
+                    Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
 
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "$button_title" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 20 90
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "$button_title" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
     case $? in
     $DIALOG_OK)
@@ -586,7 +600,15 @@ update_device_fw_from_internet() {
             echo -e "\nError updating firmware: device with address $MB_ADDRESS is unavaliable!" >$TMP_FILE
         fi
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 25 120
+        sleep 1
+        echo -e "\n--------------------------------------" >>$TMP_FILE
+        echo -e "Device info after FW update:\n" >>$TMP_FILE
+        local tmp_info=$(cat $TMP_FILE)
+        read_device_info
+
+        echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
+
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -603,7 +625,13 @@ update_device_fw_from_internet() {
 
 update_all_devices_fw_from_internet() {
     show_yes_no_dialog "WARNING" \
-        "   Are yous sure to update firmwares of \n  \
+        "   
+                      Attention!\n
+Firmware updating process may take up to several minutes.\n
+                Don't interrupt this process!!!\n
+          Otherwise you will damage your devices!!!\n\n        
+
+        Are yous sure to update firmwares of \n  \
                   ALL DEVICES\n \
              configured in controller?"
     case $? in
@@ -634,6 +662,10 @@ update_fw_using_file() {
     read_device_info
 
     echo -e "--------------------------------------\n" >>$TMP_FILE
+    echo -e "                                                 Attention!!!\n
+                    Firmware updating process may take up to several minutes.\n
+                    Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
+
     while [ 1 ]; do
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Select FW file" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
@@ -660,7 +692,7 @@ update_fw_using_file() {
                 read_device_info
 
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
-                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 30 120
+                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 32 150
                 write_log "$(cat $TMP_FILE)"
                 return
             else
@@ -693,14 +725,14 @@ main_menu() {
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
      
-        Chose action to do" 28 100 8 \
+        Choose action to do" 28 100 8 \
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
             "3 Read/write register" "read register using current settings" \
             "4 Quick device scan" "scan network using current settings (about 1 minute)" \
             "5 Complete device scan" "scan network using all settings combinations (about 1 hour)" \
-            "6 FW update" "Device firmware update" \
-            "7 Show log file" "Show log file of current session" 2>$TMP_FILE
+            "6 FW update" "device firmware update" \
+            "7 Show log file" "show log file of current session" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
@@ -716,7 +748,7 @@ main_menu() {
             esac
             ;;
         $DIALOG_HELP)
-            show_help "HELP" "\n                                                 This is a bref user guide of WB-MW-EXPLORER\n\n
+            show_help "HELP" "\n                                              This is a short user guide of WB-MW-EXPLORER tool\n\n
             wb-mb-explorer is a tool for easy scan and configure Wirenboard Modbus devices. \n
             It is a pseudographical cover for modbus_client, wb-mcu-fw-flasher and wb-mcu-fw-updater tools. \n
             Configuration is stored in /root/wb-mb-explorer.conf file, log of last session is stored in /root/wb-mb-explorer.log file. \n\n
@@ -760,16 +792,25 @@ write_log() {
 main() {
     clear
 
-    #Clear log file
-    echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
+    #check serial driver for running before starting script
+    if [[ "$(systemctl is-active wb-mqtt-serial)" = "active" ]]; then
+        serial_driver_was_running=1
+    else
+        serial_driver_was_running=0
+    fi
+
     #Stop driver wb-mqtt-serial
     stop_serial_driver
 
     #Reading current communication settings
     read_communication_settings
 
+    #Clear log file
+    echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
+
     #Show main menu
     main_menu
+
 }
 
 main
