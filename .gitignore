@@ -1,0 +1,10 @@
+*.vscode*
+*.pyc*
+*firmwares*
+*.wbfw*
+debian/wb-mb-explorer
+debian/.debhelper/
+debian/*.debhelper.log
+debian/*.substvars
+debian/*.debhelper
+debian/files

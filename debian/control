@@ -1,0 +1,9 @@
+Source: wb-mb-explorer
+Maintainer: Dmitry Vorobjev <d.vorobjev@wirenboard.ru>
+Priority: optional
+Section: unknown
+
+Package: wb-mb-explorer
+Architecture: all
+Depends: ${misc:Depends}, modbus-utils, wb-mcu-fw-flasher, wb-mcu-fw-updater
+Description: wb-mb-explorer is a tool for diagnostics and configuring Modbus devices by Wirenboard
