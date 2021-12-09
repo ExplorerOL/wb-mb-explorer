@@ -1,3 +1,9 @@
+wb-mb-explorer (1.0.1) stable; urgency=medium
+
+  * Auxilary changements for building deb package
+
+ -- root <root@wbdevenv>  Thu, 09 Dec 2021 10:05:14 +0300
+
 wb-mb-explorer (1.0.0) stable; urgency=medium
 
   * Initial release
