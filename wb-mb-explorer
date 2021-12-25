@@ -568,6 +568,8 @@ fw_update_menu() {
 }
 
 update_device_fw_from_internet() {
+    stop_serial_driver
+
     local window_title="DEVICE FW UPDATE"
     local button_title="Update firmware"
 
@@ -590,7 +592,8 @@ update_device_fw_from_internet() {
     case $? in
     $DIALOG_OK)
 
-        wb-mcu-fw-updater update-fw -a$MB_ADDRESS $COM_PORT $1 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[......//g' -e 's/\[..//g' >>$TMP_FILE
+        wb-mcu-fw-updater update-fw -a$MB_ADDRESS $COM_PORT $1 2>&1 | tee -a $TMP_FILE
+        sed -i -e 's/[[:cntrl:]]//g' -e 's/\[......//g' -e 's/\[..//g' $TMP_FILE
 
         if [[ -z $(cat $TMP_FILE | grep Done) ]]; then
             echo -e "\nError updating firmware: device with address $MB_ADDRESS is unavaliable!" >$TMP_FILE
@@ -604,7 +607,7 @@ update_device_fw_from_internet() {
 
         echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -620,6 +623,8 @@ update_device_fw_from_internet() {
 }
 
 update_all_devices_fw_from_internet() {
+    stop_serial_driver
+
     show_yes_no_dialog "WARNING" \
         "   
                       Attention!\n
@@ -634,8 +639,9 @@ Firmware updating process may take up to several minutes.\n
     $DIALOG_OK)
         write_log "+++++ ALL DEVICES FW UPDATE"
         echo -e "\nUpdate FW of all devicess configured in controller at port $COM_PORT\n" >$TMP_FILE
-        wb-mcu-fw-updater update-all 2>&1 | sed -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' >>$TMP_FILE
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 32 150
+        wb-mcu-fw-updater update-all 2>&1 | tee -a $TMP_FILE
+        sed -i -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' $TMP_FILE
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -651,6 +657,8 @@ Firmware updating process may take up to several minutes.\n
 }
 
 update_fw_using_file() {
+    stop_serial_driver
+
     local window_title="DEVICE FW UPDATE USING FILE"
 
     write_log "+++++ $window_title"
@@ -676,7 +684,7 @@ update_fw_using_file() {
                 case $? in
                 $DIALOG_OK)
 
-                    wb-mcu-fw-flasher -d $COM_PORT -a$MB_ADDRESS -j -f $fw_file 2>&1 >>$TMP_FILE
+                    wb-mcu-fw-flasher -d $COM_PORT -a$MB_ADDRESS -j -f $fw_file 2>&1 | tee -a $TMP_FILE
                     ;;
                 *) return ;;
 
@@ -688,7 +696,7 @@ update_fw_using_file() {
                 read_device_info
 
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
-                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 32 150
+                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 45 150
                 write_log "$(cat $TMP_FILE)"
                 return
             else

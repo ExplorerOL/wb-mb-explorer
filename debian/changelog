@@ -1,8 +1,16 @@
+wb-mb-explorer (1.0.2) stable; urgency=medium
+
+  * Logs are shown during FW update
+  * Size of window with results was increased
+  * Check for serial driver stopped before FW update
+
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Sat, 25 Dec 2021 14:41:00 +0300
+
 wb-mb-explorer (1.0.1) stable; urgency=medium
 
   * Auxilary changements for building deb package
 
- -- root <root@wbdevenv>  Thu, 09 Dec 2021 10:05:14 +0300
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Thu, 09 Dec 2021 10:05:14 +0300
 
 wb-mb-explorer (1.0.0) stable; urgency=medium
 
