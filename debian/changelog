@@ -1,3 +1,9 @@
+wb-mb-explorer (1.0.3) stable; urgency=medium
+
+  * Communication parameters were added to option Update FW using file
+
+ -- root <root@wbdevenv>  Sun, 09 Jan 2022 14:43:24 +0300
+
 wb-mb-explorer (1.0.2) stable; urgency=medium
 
   * Logs are shown during FW update

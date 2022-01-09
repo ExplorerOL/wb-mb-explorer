@@ -684,7 +684,7 @@ update_fw_using_file() {
                 case $? in
                 $DIALOG_OK)
 
-                    wb-mcu-fw-flasher -d $COM_PORT -a$MB_ADDRESS -j -f $fw_file 2>&1 | tee -a $TMP_FILE
+                    wb-mcu-fw-flasher -d $COM_PORT -b$BAUDRATE -b$PARITY -s$STOPBITS -a$MB_ADDRESS -j -f $fw_file 2>&1 | tee -a $TMP_FILE
                     ;;
                 *) return ;;
 
