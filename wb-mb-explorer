@@ -4,7 +4,7 @@ SETTINGS_FILE="/etc/wb-mb-explorer.conf"
 LOG_FILE="/var/log/wb-mb-explorer.log"
 
 DIALOG="dialog"
-DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for diagnostics and configuring Modbus devices by Wirenboard")
+DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for diagnostics and configuring Wirenboard devices with Modbus")
 DIALOG_OK=0
 DIALOG_CANCEL=1
 DIALOG_HELP=2
@@ -131,11 +131,11 @@ set_communication_settings() {
 }
 
 set_com_port() {
-    COM_PORT=$($DIALOG --stdout --title "Please choose a port to use" --fselect /dev/ttyRS485 14 100)
+    COM_PORT=$($DIALOG --stdout --title "Please choose a port to use" --fselect /dev/ttyRS485-1 14 100)
 }
 
 set_baudrate() {
-    $DIALOG --title "Baudrate" --radiolist "Choose avaliable option for baudrate:" 20 61 5 \
+    $DIALOG --title "Baudrate" --radiolist "Choose avaliable option for baudrate:" 20 61 7 \
         "1200" "bit/s" off \
         "4800" "bit/s" off \
         "9600" "bit/s" ON \
@@ -431,9 +431,9 @@ quick_scan() {
 
     stop_serial_driver
 
-    write_log "+++++ QUICK SCAN"
+    write_log "+++++ QUICK DEVICE SCAN"
 
-    echo "Scan results (quick scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+    echo "Scan results (quick device scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
     echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
     echo -e "------------------------------------------------------------\n" >>$TMP_FILE
 
@@ -443,8 +443,8 @@ quick_scan() {
 
             echo "XXX"
             echo $(($progress * 100 / 247))
-            echo -e "\nQuick scan of devices using\n Port = $COM_PORT, Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS"
-            echo "Address = $a"
+            echo -e "\nQuick scan of devices using Port = $COM_PORT\n Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS"
+            echo " Address = $a"
             echo " "
             tail -n10 $TMP_FILE
             echo "XXX"
@@ -460,9 +460,9 @@ quick_scan() {
             sleep 0.01
         done
     ) |
-        $DIALOG --title "QUICK SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
+        $DIALOG --title "QUICK DEVICE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
-    $DIALOG --title "QUICK SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    $DIALOG --title "QUICK DEVICE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
 
     write_log "$(cat $TMP_FILE)"
 }
@@ -477,9 +477,9 @@ complete_scan() {
 
     stop_serial_driver
 
-    write_log "+++++ COMPLETE SCAN"
+    write_log "+++++ COMPLETE DEVICE SCAN"
 
-    echo "Scan results (complete scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+    echo "Scan results (complete device scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
     echo "Port = $COM_PORT" >>$TMP_FILE
     echo -e "------------------------------------------------------------\n" >>$TMP_FILE
     (
@@ -492,7 +492,7 @@ complete_scan() {
                         echo "XXX"
                         echo $(($progress * 100 / 11808))
                         echo -e "\nComplete scan of devices using Port = $COM_PORT"
-                        echo "Baudrate = $b, Address = $a,  Parity = $p, Stop bits = $s"
+                        echo " Baudrate = $b, Address = $a,  Parity = $p, Stop bits = $s"
                         echo " "
                         tail -n10 $TMP_FILE
                         echo "XXX"
@@ -514,35 +514,35 @@ complete_scan() {
         done
 
     ) |
-        $DIALOG --title "COMPLETE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
+        $DIALOG --title "COMPLETE DEVICE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 
-    $DIALOG --title "COMPLETE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    $DIALOG --title "COMPLETE DEVICE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
 
     write_log "$(cat $TMP_FILE)"
 }
 
 fw_update_menu() {
     while [ 1 ]; do
-        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FW UPDATE" \
+        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FIRMWARE UPDATE" \
             --menu "\n                                                   Attention!!! \n\n \
         These functions are intended for updating firmwares of devices connected via RS-485 network. \n \
         Do not do this if you are not sure in correctness of your actions. \n \
             
             \n Current communication settings: \n\
-            \n\
     Port: $COM_PORT \n\
     Baudrate: $BAUDRATE \n\
     Parity: $PARITY \n\
-    Stopbits: $STOPBITS \n\
+    Stopbits: $STOPBITS \n\n\
+Current device settings: \n\
     Address: $MB_ADDRESS \n\
     Modbus register: $MB_REGISTER \n\
     Modbus register type: $MB_REG_TYPE \n\
     \n\n\
     Chose action to do" 30 120 8 \
-            "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
-            "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from Internet" \
-            "Update FW of all devices" "Update FWs of all devices configured in controller at port $COM_PORT from Internet" \
-            "Update FW using file" "FW of device with address $MB_ADDRESS at port $COM_PORT will be updated using FW file" 2>$TMP_FILE
+            "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from repository" \
+            "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from repository" \
+            "Update FW of all devices" "Update FW of all devices configured in controller from repository" \
+            "Update FW using file" "Update FW of device with address $MB_ADDRESS at port $COM_PORT using file" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
@@ -593,6 +593,7 @@ update_device_fw_from_internet() {
     $DIALOG_OK)
 
         wb-mcu-fw-updater update-fw -a$MB_ADDRESS $COM_PORT $1 2>&1 | tee -a $TMP_FILE
+        sleep 2
         sed -i -e 's/[[:cntrl:]]//g' -e 's/\[......//g' -e 's/\[..//g' $TMP_FILE
 
         if [[ -z $(cat $TMP_FILE | grep Done) ]]; then
@@ -640,6 +641,7 @@ Firmware updating process may take up to several minutes.\n
         write_log "+++++ ALL DEVICES FW UPDATE"
         echo -e "\nUpdate FW of all devicess configured in controller at port $COM_PORT\n" >$TMP_FILE
         wb-mcu-fw-updater update-all 2>&1 | tee -a $TMP_FILE
+        sleep 2
         sed -i -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' $TMP_FILE
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
         local dialog_button=$?
@@ -675,16 +677,15 @@ update_fw_using_file() {
 
         case $? in
         $DIALOG_OK)
-            local fw_file=$($DIALOG --stdout --title "$window_title" --fselect /root/vda/firmwares 14 100)
+            local fw_file=$($DIALOG --stdout --title "$window_title" --fselect /root 14 100)
             if [[ -f $fw_file && -n $(echo $fw_file | grep ".wbfw") ]]; then
                 echo "Firmware file:" $fw_file >>$TMP_FILE
-                #sleep 5
-                #echo -e "\nFirmware " >>$TMP_FILE
                 $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Start" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
                 case $? in
                 $DIALOG_OK)
 
                     wb-mcu-fw-flasher -d $COM_PORT -b$BAUDRATE -b$PARITY -s$STOPBITS -a$MB_ADDRESS -j -f $fw_file 2>&1 | tee -a $TMP_FILE
+                    sleep 2
                     ;;
                 *) return ;;
 
@@ -700,7 +701,7 @@ update_fw_using_file() {
                 write_log "$(cat $TMP_FILE)"
                 return
             else
-                show_msg_box "ERROR" "File with firmware was no found!"
+                show_msg_box "ERROR" "File with firmware not found or not chosen!"
 
             fi
             ;;
@@ -719,11 +720,11 @@ main_menu() {
     while [ 1 ]; do
         $DIALOG --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
             --menu "\n Current communication settings: \n\
-    \n\
     Port: $COM_PORT \n\
     Baudrate: $BAUDRATE \n\
     Parity: $PARITY \n\
-    Stopbits: $STOPBITS \n\
+    Stopbits: $STOPBITS \n\n\
+Current device settings: \n\
     Address: $MB_ADDRESS \n\
     Modbus register: $MB_REGISTER \n\
     Modbus register type: $MB_REG_TYPE \n\
@@ -732,9 +733,9 @@ main_menu() {
         Choose action to do" 28 100 8 \
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
-            "3 Read/write register" "read register using current settings" \
-            "4 Quick device scan" "scan network using current settings (about 1 minute)" \
-            "5 Complete device scan" "scan network using all settings combinations (about 1 hour)" \
+            "3 Read/write register" "read/write register using current settings" \
+            "4 Quick device scan" "scan of addresses using current comm settings (about 1 minute)" \
+            "5 Complete device scan" "scan using all comm settings combinations (about 1 hour)" \
             "6 FW update" "device firmware update" \
             "7 Show log file" "show log file of current session" 2>$TMP_FILE
 
@@ -761,11 +762,11 @@ main_menu() {
             2 Show device info - reads most importand Wirenboard device information (device model, firmware version and etc.)\n
             3 Read/write register - allows user to read and write register of Modbus device using current \n
                                     communication settings\n
-            4 Quick device scan - scans network for Wirenboard devices with addresses from 1 to 247 using current\n
-                                communication settings\n
-            5 Complete device scan - scans network for Wirenboard devices with addresses from 1 to 247 using all\n
-                                     possible communication settings\n
-            6 FW update - allows to update firmwares of wirenboard devices\n
+            4 Quick device scan - network scan for Wirenboard devices with addresses from 1 to 247 using current\n
+                                  communication settings of port\n
+            5 Complete device scan - network scan for Wirenboard devices with addresses from 1 to 247 using all\n
+                                     possible communication settings combinations of chosen port\n
+            6 FW update - allows to update firmwares of Wirenboard devices\n
             7 Show log file - shows log file of current programm session\n\n
     To switch between menu items use Up and Down keys, for selecting answer buttons use TAB key or Left and Right keys.\n
     For filenames completion in selecting files dialogs use SPACE key."

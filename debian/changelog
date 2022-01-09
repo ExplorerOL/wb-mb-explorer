@@ -1,8 +1,16 @@
+wb-mb-explorer (1.0.4) stable; urgency=medium
+
+  * Correction of text labels
+  * Delay was added after firmware update to see results
+  * Default paths to firmwares and port were changed
+
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Sun, 09 Jan 2022 15:01:38 +0300
+
 wb-mb-explorer (1.0.3) stable; urgency=medium
 
   * Communication parameters were added to option Update FW using file
 
- -- root <root@wbdevenv>  Sun, 09 Jan 2022 14:43:24 +0300
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Sun, 09 Jan 2022 14:43:24 +0300
 
 wb-mb-explorer (1.0.2) stable; urgency=medium
 
