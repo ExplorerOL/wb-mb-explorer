@@ -131,7 +131,12 @@ set_communication_settings() {
 }
 
 set_com_port() {
-    COM_PORT=$($DIALOG --stdout --title "Please choose a port to use" --fselect /dev/ttyRS485-1 14 100)
+    local new_com_port=$($DIALOG --stdout --title "Please choose a port to use" --fselect /dev/ttyRS485-1 14 100)
+    if [[ -f $new_com_port ]]; then
+        COM_PORT=$new_com_port
+    else
+        show_msg_box "ERROR" "Port is incorrect or not selected!"
+    fi
 }
 
 set_baudrate() {
