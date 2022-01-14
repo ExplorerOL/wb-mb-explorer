@@ -1,3 +1,9 @@
+wb-mb-explorer (1.0.6) stable; urgency=medium
+
+  * Port name check was fixed
+
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Fri, 14 Jan 2022 09:02:27 +0300
+
 wb-mb-explorer (1.0.5) stable; urgency=medium
 
   * Check of correctness port name was added
