@@ -21,7 +21,7 @@ SIG_KILL=9
 SIG_TERM=15
 
 TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
-trap "rm -f $TMP_FILE" $SIG_HUP $SIG_QUIT $SIG_KILL $SIG_TERM
+trap "rm -f $TMP_FILE" $SIG_NONE $SIG_HUP $SIG_QUIT $SIG_KILL $SIG_TERM
 
 # exit confirmation window
 show_exit_dialog() {
