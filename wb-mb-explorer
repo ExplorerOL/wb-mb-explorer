@@ -91,25 +91,25 @@ save_communication_settings() {
 set_communication_settings() {
     while [ 1 ]; do
         $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "COMMUNICATIONS SETTINGS" --clear --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
-            --menu "\n Current communication settings: \n\
-    \n\
-    Port: $COM_PORT \n\
-    Baudrate: $BAUDRATE \n\
-    Parity: $PARITY \n\
-    Stopbits: $STOPBITS \n\
-    Device address: $MB_ADDRESS \n\
-    Modbus register: $MB_REGISTER \n\
-    Modbus register type: $MB_REG_TYPE \n\
-    \n\n\
-     
-        Chose action to do" 28 100 15 \
-            "Set port" "Current setting: $COM_PORT" \
-            "Set baudrate" "Current setting: $BAUDRATE" \
-            "Set parity" "Current setting: $PARITY" \
-            "Set stopbits" "Current setting: $STOPBITS" \
-            "Set device address" "Current setting: $MB_ADDRESS" \
-            "Set Modbus register" "Current setting: $MB_REGISTER" \
-            "Set register type" "Current setting: $MB_REG_TYPE" 2>${TMP_FILE}
+            --menu "\n
+            Current communication settings: \n\
+                Port: $COM_PORT \n\
+                Baudrate: $BAUDRATE \n\
+                Parity: $PARITY \n\
+                Stopbits: $STOPBITS \n\
+                Device address: $MB_ADDRESS \n\
+                Modbus register: $MB_REGISTER \n\
+                Modbus register type: $MB_REG_TYPE \n\
+                \n\n\
+            
+                        Chose setting to change:       Current value:" 28 100 15 \
+            "Set port" "$COM_PORT" \
+            "Set baudrate" "$BAUDRATE" \
+            "Set parity" "$PARITY" \
+            "Set stopbits" "$STOPBITS" \
+            "Set device address" "$MB_ADDRESS" \
+            "Set Modbus register" "$MB_REGISTER" \
+            "Set register type" "$MB_REG_TYPE" 2>${TMP_FILE}
 
         case $? in
         $DIALOG_OK) case $(cat ${TMP_FILE}) in
@@ -428,50 +428,96 @@ write_register() {
     write_log "$(cat $TMP_FILE)"
 }
 
-quick_scan() {
-    local a
-    local scanResult
-    local devNumber=0
-    local progress=0
+menu_network_scan() {
+    while [ 1 ]; do
+        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "NETWORK SCAN" \
+            --menu "\n 
+    Current communication settings: \n\
+        Port: $COM_PORT \n\
+        Baudrate: $BAUDRATE \n\
+        Parity: $PARITY \n\
+        Stopbits: $STOPBITS \n\n\
 
+    Current device settings: \n\
+        Address: $MB_ADDRESS \n\
+        \n\n\
+        Chose action to do" 30 120 8 \
+            "Comm settings scan" "Detection communication settings of device with address $MB_ADDRESS at port $COM_PORT" \
+            "Scan of addresses" "Scan network for devices using current communication settings" \
+            "Complete scan" "Scan network for devices using all possible communication settings" 2>$TMP_FILE
+
+        case $? in
+        $DIALOG_OK)
+            case $(cat $TMP_FILE) in
+            "Comm settings scan") comm_settings_scan ;;
+            "Scan of addresses") address_scan ;;
+            "Complete scan") complete_scan ;;
+            esac
+            ;;
+        $DIALOG_HELP)
+            show_help "NETWORK SCAN HELP" "\n
+        Comm settings scan - tool tries to communicate with device using specified port, address\n
+                             and all combinations of other communication settings\n\n
+        Scan of addresses - tool searches for devices using specified port and communication settings\n\n
+        Complete scan - tool searches for devices using specified port. All possible combinations\n
+                        will be used\n"
+            ;;
+        *) return ;;
+        esac
+    done
+
+}
+
+comm_settings_scan() {
     stop_serial_driver
 
-    write_log "+++++ QUICK DEVICE SCAN"
+    write_log "+++++ COMM SETTINGS SCAN"
 
-    echo "Scan results (quick device scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
+    echo "Scan results (comm settings scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+    echo "Port = $COM_PORT Address = $MB_ADDRESS " >>$TMP_FILE
     echo -e "------------------------------------------------------------\n" >>$TMP_FILE
 
-    (
-        for a in {1..247}; do
-            progress=$(($progress + 1))
+    network_scan "comm_settings"
 
-            echo "XXX"
-            echo $(($progress * 100 / 247))
-            echo -e "\nQuick scan of devices using Port = $COM_PORT\n Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS"
-            echo " Address = $a"
-            echo " "
-            tail -n10 $TMP_FILE
-            echo "XXX"
-
-            scanResult=$(modbus_read_hex_value $a 4 128 1)
-            if [[ -z $(echo $scanResult | grep ERROR) ]]; then
-                devNumber=$(($devNumber + 1))
-                WBDeviceModel=$(modbus_read_text $a 4 200 6)
-                WBFWVersion=$(modbus_read_text $a 4 250 16)
-
-                echo "$devNumber Address = $a, Device model = $WBDeviceModel, FW version = $WBFWVersion" >>$TMP_FILE
-            fi
-            sleep 0.01
-        done
-    ) |
-        $DIALOG --title "QUICK DEVICE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
-
-    $DIALOG --title "QUICK DEVICE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    $DIALOG --title "COMM SETTINGS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
 
     write_log "$(cat $TMP_FILE)"
 }
+
+address_scan() {
+    stop_serial_driver
+
+    write_log "+++++ ADDRESS SCAN"
+
+    echo "Scan results (address scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
+    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
+
+    network_scan "address"
+
+    $DIALOG --title "ADDRESS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+
+    write_log "$(cat $TMP_FILE)"
+}
+
 complete_scan() {
+    stop_serial_driver
+
+    write_log "+++++ COMPLETE NETWORK SCAN"
+
+    echo "Scan results (complete network scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
+    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
+
+    network_scan
+    #    sleep 3
+
+    $DIALOG --title "COMPLETE NETWORK SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+
+    write_log "$(cat $TMP_FILE)"
+}
+
+network_scan() {
     local a
     local b
     local p
@@ -480,24 +526,44 @@ complete_scan() {
     local devNumber=0
     local progress=0
 
-    stop_serial_driver
+    local scan_baudrate="9600 115200 19200 57600 38400 4800 2400 1200"
+    local scan_addr_first=1
+    local scan_addr_last=247
+    local scan_parity="none odd even"
+    local scan_stopbits="1 2"
+    local scan_quantity=11808
+    local dialog_title="COMPLETE DEVICE SCAN"
 
-    write_log "+++++ COMPLETE DEVICE SCAN"
+    case "$1" in
+    "comm_settings")
+        scan_addr_first=$MB_ADDRESS
+        scan_addr_last=$MB_ADDRESS
+        scan_quantity=48
+        dialog_title="COMM SETTINGS SCAN"
+        ;;
+    "address")
+        scan_baudrate=$BAUDRATE
+        scan_parity=$PARITY
+        scan_stopbits=$STOPBITS
+        scan_quantity=247
+        dialog_title="ADDRESSES SCAN"
+        ;;
+    *) ;;
+    esac
 
-    echo "Scan results (complete device scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-    echo "Port = $COM_PORT" >>$TMP_FILE
-    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
+    #    sleep 5
+
     (
-        for b in 9600 115200 19200 57600 38400 4800 2400 1200; do
-            for a in {1..247}; do
-                for p in none odd even; do
-                    for s in 1 2; do
+        for b in $scan_baudrate; do
+            for a in $(seq $scan_addr_first $scan_addr_last); do
+                for p in $scan_parity; do
+                    for s in $scan_stopbits; do
                         progress=$(($progress + 1))
 
                         echo "XXX"
-                        echo $(($progress * 100 / 11808))
-                        echo -e "\nComplete scan of devices using Port = $COM_PORT"
-                        echo " Baudrate = $b, Address = $a,  Parity = $p, Stop bits = $s"
+                        echo $(($progress * 100 / $scan_quantity))
+                        echo -e "\nScan for devices using Port = $COM_PORT"
+                        echo " Address = $a, Baudrate = $b, Parity = $p, Stop bits = $s"
                         echo " "
                         tail -n10 $TMP_FILE
                         echo "XXX"
@@ -519,31 +585,24 @@ complete_scan() {
         done
 
     ) |
-        $DIALOG --title "COMPLETE DEVICE SCAN" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
-
-    $DIALOG --title "COMPLETE DEVICE SCAN RESULTS" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
-
-    write_log "$(cat $TMP_FILE)"
+        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
 }
 
-fw_update_menu() {
+menu_fw_update() {
     while [ 1 ]; do
         ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FIRMWARE UPDATE" \
             --menu "\n                                                   Attention!!! \n\n \
         These functions are intended for updating firmwares of devices connected via RS-485 network. \n \
-        Do not do this if you are not sure in correctness of your actions. \n \
-            
-            \n Current communication settings: \n\
-    Port: $COM_PORT \n\
-    Baudrate: $BAUDRATE \n\
-    Parity: $PARITY \n\
-    Stopbits: $STOPBITS \n\n\
-Current device settings: \n\
-    Address: $MB_ADDRESS \n\
-    Modbus register: $MB_REGISTER \n\
-    Modbus register type: $MB_REG_TYPE \n\
-    \n\n\
-    Chose action to do" 30 120 8 \
+        Do not do this if you are not sure in correctness of your actions. \n\n\
+    Current communication settings: \n\
+        Port: $COM_PORT \n\
+        Baudrate: $BAUDRATE \n\
+        Parity: $PARITY \n\
+        Stopbits: $STOPBITS \n\n\
+    Current device settings: \n\
+        Address: $MB_ADDRESS \n\
+        \n\n\
+        Chose action to do" 30 120 8 \
             "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from repository" \
             "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from repository" \
             "Update FW of all devices" "Update FW of all devices configured in controller from repository" \
@@ -559,12 +618,12 @@ Current device settings: \n\
             esac
             ;;
         $DIALOG_HELP)
-            show_help "HELP" "\n                    FW UPDATE help \n\n
-        1 Device FW update - updates FW of device with current communication settings.\n
-                             The newest version of firmware is downloaded from internet automatically\n
-        2 Force device FW update - like item 1, but reflashes device even it already has the newest FW version\n
-        3 Update FW of all devices - like item 1, but for ALL devices configured in Wirenboard controller\n
-        4 Update FW using file - updates FW of device with current communication settings using specified FW file\n"
+            show_help "HELP" "\n
+        Device FW update - updates FW of device with current communication settings.\n
+                           The newest version of firmware is downloaded from internet automatically\n\n
+        Force device FW update - like Device FW update, but reflashes device even it has the newest FW version already\n\n
+        Update FW of all devices - like Device FW update, but for ALL devices configured in Wirenboard controller\n\n
+        Update FW using file - updates FW of device with current communication settings using specified FW file\n"
             ;;
         *) return ;;
         esac
@@ -634,7 +693,7 @@ update_all_devices_fw_from_internet() {
     show_yes_no_dialog "WARNING" \
         "   
                       Attention!\n
-Firmware updating process may take up to several minutes.\n
+ Firmware updating process may take up to several minutes.\n
                 Don't interrupt this process!!!\n
           Otherwise you will damage your devices!!!\n\n        
 
@@ -724,25 +783,25 @@ main_menu() {
 
     while [ 1 ]; do
         $DIALOG --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
-            --menu "\n Current communication settings: \n\
-    Port: $COM_PORT \n\
-    Baudrate: $BAUDRATE \n\
-    Parity: $PARITY \n\
-    Stopbits: $STOPBITS \n\n\
-Current device settings: \n\
-    Address: $MB_ADDRESS \n\
-    Modbus register: $MB_REGISTER \n\
-    Modbus register type: $MB_REG_TYPE \n\
-    \n\n\
+            --menu "\n
+            Current communication settings: \n\
+                Port: $COM_PORT \n\
+                Baudrate: $BAUDRATE \n\
+                Parity: $PARITY \n\
+                Stopbits: $STOPBITS \n\n\
+            Current device settings: \n\
+                Address: $MB_ADDRESS \n\
+                Modbus register: $MB_REGISTER \n\
+                Modbus register type: $MB_REG_TYPE \n\
+                \n\n\
      
-        Choose action to do" 28 100 8 \
+            Choose action to do                     " 28 100 8 \
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
             "3 Read/write register" "read/write register using current settings" \
-            "4 Quick device scan" "scan of addresses using current comm settings (about 1 minute)" \
-            "5 Complete device scan" "scan using all comm settings combinations (about 1 hour)" \
-            "6 FW update" "device firmware update" \
-            "7 Show log file" "show log file of current session" 2>$TMP_FILE
+            "4 Network scan" "network scan for Wirenboard devices" \
+            "5 FW update" "device firmware update" \
+            "6 Show log file" "show log file of current session" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
@@ -750,29 +809,25 @@ Current device settings: \n\
             "1 Settings") set_communication_settings ;;
             "2 Show device info") show_device_info ;;
             "3 Read/write register") read_register ;;
-            "4 Quick device scan") quick_scan ;;
-            "5 Complete device scan") complete_scan ;;
-            "6 FW update") fw_update_menu ;;
-            "7 Show log file") show_log_file ;;
+            "4 Network scan") menu_network_scan ;;
+            "5 FW update") menu_fw_update ;;
+            "6 Show log file") show_log_file ;;
             *) main_menu ;;
             esac
             ;;
         $DIALOG_HELP)
             show_help "HELP" "\n                                              This is a short user guide of WB-MW-EXPLORER tool\n\n
-            wb-mb-explorer is a tool for easy scan and configure Wirenboard Modbus devices. \n
-            It is a pseudographical cover for modbus_client, wb-mcu-fw-flasher and wb-mcu-fw-updater tools. \n
-            Configuration is stored in /root/wb-mb-explorer.conf file, log of last session is stored in /root/wb-mb-explorer.log file. \n\n
+            WB-MW-EXPLORER is a tool for easy scan and configuration network for Wirenboard Modbus devices. \n
+            It is a graphical wrapper for modbus_client, wb-mcu-fw-flasher and wb-mcu-fw-updater tools. \n
+            Configuration is stored in /etc/wb-mb-explorer.conf file, log of last session is stored in /var/log/wb-mb-explorer.log file. \n\n
             1 Settings  -   lets user to choose communication settings, which will be used for communication\n
                             with a device\n
             2 Show device info - reads most importand Wirenboard device information (device model, firmware version and etc.)\n
             3 Read/write register - allows user to read and write register of Modbus device using current \n
                                     communication settings\n
-            4 Quick device scan - network scan for Wirenboard devices with addresses from 1 to 247 using current\n
-                                  communication settings of port\n
-            5 Complete device scan - network scan for Wirenboard devices with addresses from 1 to 247 using all\n
-                                     possible communication settings combinations of chosen port\n
-            6 FW update - allows to update firmwares of Wirenboard devices\n
-            7 Show log file - shows log file of current programm session\n\n
+            4 Network scan - scanning network for Wirenboard devices\n                        
+            5 FW update - allows to update firmwares of Wirenboard devices\n
+            6 Show log file - shows log file of current programm session\n\n
     To switch between menu items use Up and Down keys, for selecting answer buttons use TAB key or Left and Right keys.\n
     For filenames completion in selecting files dialogs use SPACE key."
             ;;
