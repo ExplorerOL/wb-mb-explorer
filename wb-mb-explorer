@@ -252,7 +252,7 @@ modbus_write() {
 
 #Function of reading hex value from Modbus register
 #   If reading was successfull - hex value is returned
-#   If reading was unsuccessfull - full output with error is returned
+#   If reading was unsuccessfull - return complete command output
 modbus_read_hex_value() {
     readRawResult=$(modbus_read_raw $1 $2 $3 $4)
     readHexValue=$(echo "$readRawResult" | grep Data | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
@@ -276,34 +276,6 @@ modbus_read_text() {
     echo -e $(modbus_read_raw $1 $2 $3 $4 | grep Data | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g') | tr -d "\0"
 }
 
-read_short_device_info() {
-    #Device model
-    local device_model=$(modbus_read_text $MB_ADDRESS 4 200 6)
-
-    #Device serial number
-    local serial_number=$(modbus_read_hex_value $MB_ADDRESS 4 270 2)
-    serial_number=$(value_hex_to_dec $serial_number)
-    if [[ -n $(echo $device_model | grep MAP) ]]; then
-        serial_number=$((serial_number - 4261412864))
-    fi
-
-    #Device FW version
-    local fw_version=$(modbus_read_text $MB_ADDRESS 4 250 16)
-
-    case "$1" in
-    "info")
-        echo "Device model:" $device_model >>$TMP_FILE
-        echo "Serial number:" $serial_number >>$TMP_FILE
-        echo "FW version:" $fw_version >>$TMP_FILE
-        ;;
-    "scan")
-        local return_info=$(echo "Device model = $device_model, Serial = $serial_number, FW version = $fw_version")
-        eval "$2=\"$return_info\""
-        ;;
-    esac
-
-}
-
 read_device_info() {
     echo -e "\nReading info from device using following communication settings:" >$TMP_FILE
     echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
@@ -313,7 +285,20 @@ read_device_info() {
 
     if [[ -z $(echo $device_address | grep ERROR) ]]; then
 
-        read_short_device_info info
+        #Device model
+        local device_model=$(modbus_read_text $MB_ADDRESS 4 200 6)
+        echo "Device model:" $device_model >>$TMP_FILE
+
+        #Device serial number
+        local serial_number=$(modbus_read_hex_value $MB_ADDRESS 4 270 2)
+        serial_number=$(value_hex_to_dec $serial_number)
+        if [[ -n $(echo $device_model | grep MAP) ]]; then
+            serial_number=$(($serial_number - 4261412864))
+        fi
+        echo "Serial number:" $serial_number >>$TMP_FILE
+
+        #Device FW version
+        echo "FW version:" $(modbus_read_text $MB_ADDRESS 4 250 16) >>$TMP_FILE
 
         #Device FW signature
         echo "FW signature:" $(modbus_read_text $MB_ADDRESS 4 290 12) >>$TMP_FILE
@@ -416,10 +401,8 @@ write_register() {
     "coil") MBFunction="0x05" ;;
     "holding") MBFunction="0x06" ;;
     "descrete" | "input")
-        #$DIALOG --sleep 2 --title "INFO BOX" --infobox "Register type is $MB_REG_TYPE, can't write!" 10 52
         show_msg_box "ERROR" "Register type is $MB_REG_TYPE, can't write!"
         return
-        #read_register
         ;;
     esac
 
@@ -469,9 +452,9 @@ menu_network_scan() {
         case $? in
         $DIALOG_OK)
             case $(cat $TMP_FILE) in
-            "Comm settings scan") comm_settings_scan ;;
-            "Scan of addresses") address_scan ;;
-            "Complete scan") complete_scan ;;
+            "Comm settings scan") network_scan "comm_settings" ;;
+            "Scan of addresses") network_scan "address" ;;
+            "Complete scan") network_scan "complete" ;;
             esac
             ;;
         $DIALOG_HELP)
@@ -488,62 +471,11 @@ menu_network_scan() {
 
 }
 
-comm_settings_scan() {
-    stop_serial_driver
-
-    write_log "+++++ COMM SETTINGS SCAN"
-
-    echo "Scan results (comm settings scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-    echo "Port = $COM_PORT Address = $MB_ADDRESS " >>$TMP_FILE
-    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
-
-    network_scan "comm_settings"
-
-    $DIALOG --title "COMM SETTINGS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
-
-    write_log "$(cat $TMP_FILE)"
-}
-
-address_scan() {
-    stop_serial_driver
-
-    write_log "+++++ ADDRESS SCAN"
-
-    echo "Scan results (address scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
-    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
-
-    network_scan "address"
-
-    $DIALOG --title "ADDRESS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
-
-    write_log "$(cat $TMP_FILE)"
-}
-
-complete_scan() {
-    stop_serial_driver
-
-    write_log "+++++ COMPLETE NETWORK SCAN"
-
-    echo "Scan results (complete network scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-    echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
-    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
-
-    network_scan
-    #    sleep 3
-
-    $DIALOG --title "COMPLETE NETWORK SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
-
-    write_log "$(cat $TMP_FILE)"
-}
-
 network_scan() {
     local a
     local b
     local p
     local s
-    local scanResult
-    local devNumber=0
     local progress=0
 
     local scan_baudrate="9600 115200 19200 57600 38400 4800 2400 1200"
@@ -560,6 +492,10 @@ network_scan() {
         scan_addr_last=$MB_ADDRESS
         scan_quantity=48
         dialog_title="COMM SETTINGS SCAN"
+
+        write_log "+++++ COMM SETTINGS SCAN"
+        echo "Scan results (comm settings scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+        echo "Port = $COM_PORT Address = $MB_ADDRESS " >>$TMP_FILE
         ;;
     "address")
         scan_baudrate=$BAUDRATE
@@ -567,10 +503,22 @@ network_scan() {
         scan_stopbits=$STOPBITS
         scan_quantity=247
         dialog_title="ADDRESSES SCAN"
+
+        write_log "+++++ ADDRESS SCAN"
+        echo "Scan results (address scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+        echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
         ;;
+    "complete")
+        write_log "+++++ COMPLETE NETWORK SCAN"
+        echo "Scan results (complete network scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+        echo "Port = $COM_PORT " >>$TMP_FILE
+        ;;
+    *) return 1 ;;
     esac
 
-    #    sleep 5
+    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
+
+    stop_serial_driver
 
     (
         for b in $scan_baudrate; do
@@ -587,22 +535,19 @@ network_scan() {
                         tail -n10 $TMP_FILE
                         echo "XXX"
 
-                        scanResult=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
-                        if [[ -n $scanResult ]]; then
-                            # local device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
-                            # local fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                        local scan_result=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                        if [[ -n $scan_result ]]; then
+                            local device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
 
-                            # #Device serial number
-                            # local serial_number=$(modbus_read_hex_value $MB_ADDRESS 4 270 2)
-                            # serial_number=$(value_hex_to_dec $serial_number)
-                            # if [[ -n $(echo $device_model | grep MAP) ]]; then
-                            #     serial_number=$((serial_number - 4261412864))
-                            # fi
+                            local serial_number=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r270 -c2 | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                            serial_number=$(value_hex_to_dec $serial_number)
+                            if [[ -n $(echo $device_model | grep MAP) ]]; then
+                                serial_number=$(($serial_number - 4261412864))
+                            fi
 
-                            local short_info=""
-                            read_short_device_info scan short_info
+                            local fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
 
-                            echo "Address = $a, $short_info, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
+                            echo "Address = $a, Device model = $device_model, Serial = $serial_number FW version = $fw_version, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
                         fi
                         sleep 0.01
                     done
@@ -615,6 +560,9 @@ network_scan() {
 
     ) |
         $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 135 5
+
+    write_log "$(cat $TMP_FILE)"
+    $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
 }
 
 menu_fw_update() {
