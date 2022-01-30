@@ -276,24 +276,44 @@ modbus_read_text() {
     echo -e $(modbus_read_raw $1 $2 $3 $4 | grep Data | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g') | tr -d "\0"
 }
 
+read_short_device_info() {
+    #Device model
+    local device_model=$(modbus_read_text $MB_ADDRESS 4 200 6)
+
+    #Device serial number
+    local serial_number=$(modbus_read_hex_value $MB_ADDRESS 4 270 2)
+    serial_number=$(value_hex_to_dec $serial_number)
+    if [[ -n $(echo $device_model | grep MAP) ]]; then
+        serial_number=$((serial_number - 4261412864))
+    fi
+
+    #Device FW version
+    local fw_version=$(modbus_read_text $MB_ADDRESS 4 250 16)
+
+    case "$1" in
+    "info")
+        echo "Device model:" $device_model >>$TMP_FILE
+        echo "Serial number:" $serial_number >>$TMP_FILE
+        echo "FW version:" $fw_version >>$TMP_FILE
+        ;;
+    "scan")
+        local return_info=$(echo "Device model = $device_model, Serial = $serial_number, FW version = $fw_version")
+        eval "$2=\"$return_info\""
+        ;;
+    esac
+
+}
+
 read_device_info() {
     echo -e "\nReading info from device using following communication settings:" >$TMP_FILE
     echo -e "Port $COM_PORT, Baudrate: $BAUDRATE, Parity: $PARITY, Stopbits: $STOPBITS, address $MB_ADDRESS\n" >>$TMP_FILE
     echo "----------------------------------------------------------" >>$TMP_FILE
 
-    local deviceAddress=$(modbus_read_hex_value $MB_ADDRESS 3 128 1)
+    local device_address=$(modbus_read_hex_value $MB_ADDRESS 3 128 1)
 
-    if [[ -z $(echo $deviceAddress | grep ERROR) ]]; then
-        #Device model
-        echo "Device model:" $(modbus_read_text $MB_ADDRESS 4 200 6) >>$TMP_FILE
+    if [[ -z $(echo $device_address | grep ERROR) ]]; then
 
-        #Device serial number
-        local serialNumber=$(modbus_read_hex_value $MB_ADDRESS 4 270 2)
-        serialNumber=$(value_hex_to_dec $serialNumber)
-        echo "Serial number:" $serialNumber >>$TMP_FILE
-
-        #Device FW version
-        echo "FW version:" $(modbus_read_text $MB_ADDRESS 4 250 16) >>$TMP_FILE
+        read_short_device_info info
 
         #Device FW signature
         echo "FW signature:" $(modbus_read_text $MB_ADDRESS 4 290 12) >>$TMP_FILE
@@ -479,7 +499,7 @@ comm_settings_scan() {
 
     network_scan "comm_settings"
 
-    $DIALOG --title "COMM SETTINGS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    $DIALOG --title "COMM SETTINGS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
 
     write_log "$(cat $TMP_FILE)"
 }
@@ -495,7 +515,7 @@ address_scan() {
 
     network_scan "address"
 
-    $DIALOG --title "ADDRESS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    $DIALOG --title "ADDRESS SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
 
     write_log "$(cat $TMP_FILE)"
 }
@@ -512,7 +532,7 @@ complete_scan() {
     network_scan
     #    sleep 3
 
-    $DIALOG --title "COMPLETE NETWORK SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 120
+    $DIALOG --title "COMPLETE NETWORK SCAN" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
 
     write_log "$(cat $TMP_FILE)"
 }
@@ -548,7 +568,6 @@ network_scan() {
         scan_quantity=247
         dialog_title="ADDRESSES SCAN"
         ;;
-    *) ;;
     esac
 
     #    sleep 5
@@ -570,10 +589,20 @@ network_scan() {
 
                         scanResult=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
                         if [[ -n $scanResult ]]; then
-                            WBDeviceModel=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
-                            FWVersion=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                            # local device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                            # local fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
 
-                            echo "Address = $a, Device model = $WBDeviceModel, FW version = $FWVersion, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
+                            # #Device serial number
+                            # local serial_number=$(modbus_read_hex_value $MB_ADDRESS 4 270 2)
+                            # serial_number=$(value_hex_to_dec $serial_number)
+                            # if [[ -n $(echo $device_model | grep MAP) ]]; then
+                            #     serial_number=$((serial_number - 4261412864))
+                            # fi
+
+                            local short_info=""
+                            read_short_device_info scan short_info
+
+                            echo "Address = $a, $short_info, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
                         fi
                         sleep 0.01
                     done
@@ -585,7 +614,7 @@ network_scan() {
         done
 
     ) |
-        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 120 5
+        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 135 5
 }
 
 menu_fw_update() {
@@ -779,7 +808,7 @@ show_log_file() {
     $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "LOG FILE" --exit-label "OK" --textbox $LOG_FILE 32 150
 }
 
-main_menu() {
+menu_main() {
 
     while [ 1 ]; do
         $DIALOG --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
@@ -812,7 +841,7 @@ main_menu() {
             "4 Network scan") menu_network_scan ;;
             "5 FW update") menu_fw_update ;;
             "6 Show log file") show_log_file ;;
-            *) main_menu ;;
+            *) menu_main ;;
             esac
             ;;
         $DIALOG_HELP)
@@ -874,7 +903,7 @@ main() {
     echo -e "$(date +"%Y-%m-%d %H:%M:%S") WB-MB-EXPLORER started\n" >$LOG_FILE
 
     #Show main menu
-    main_menu
+    menu_main
 
 }
 
