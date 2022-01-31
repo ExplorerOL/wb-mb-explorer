@@ -247,7 +247,7 @@ modbus_read_raw() {
 }
 
 modbus_write() {
-    modbus_client -mrtu $COM_PORT --debug -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $1 2>&1
+    modbus_client --debug -mrtu $COM_PORT -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $1 2>&1
 }
 
 #Function of reading hex value from Modbus register
@@ -476,6 +476,11 @@ network_scan() {
     local b
     local p
     local s
+    local scan_result
+    local device_model
+    local serial_number
+    local fw_version
+
     local progress=0
 
     local scan_baudrate="9600 115200 19200 57600 38400 4800 2400 1200"
@@ -530,26 +535,29 @@ network_scan() {
                         echo "XXX"
                         echo $(($progress * 100 / $scan_quantity))
                         echo -e "\nScan for devices using Port = $COM_PORT"
-                        echo " Address = $a, Baudrate = $b, Parity = $p, Stop bits = $s"
-                        echo " "
-                        tail -n10 $TMP_FILE
+                        echo " Address = $a, Baudrate = $b, Parity = $p, Stop bits = $s\n\n"
+                        echo "Scan log (last 6 results):"
+                        echo "------------------------------------------------------------\n\n"
+                        tail -n6 $TMP_FILE
                         echo "XXX"
 
-                        local scan_result=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
-                        if [[ -n $scan_result ]]; then
-                            local device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                        scan_result=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                        scan_result=$(value_hex_to_dec $scan_result)
+                        if [[ ("$scan_result" -ge "1") && ("$scan_result" -le "247") ]]; then
+                            device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
 
-                            local serial_number=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r270 -c2 | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                            serial_number=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r270 -c2 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
                             serial_number=$(value_hex_to_dec $serial_number)
                             if [[ -n $(echo $device_model | grep MAP) ]]; then
                                 serial_number=$(($serial_number - 4261412864))
                             fi
 
-                            local fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
+                            fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
 
-                            echo "Address = $a, Device model = $device_model, Serial = $serial_number FW version = $fw_version, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
+                            echo "Address = $a, Device model = $device_model, Serial = $serial_number, FW version = $fw_version, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
                         fi
                         sleep 0.01
+
                     done
 
                 done
@@ -562,7 +570,7 @@ network_scan() {
         $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 135 5
 
     write_log "$(cat $TMP_FILE)"
-    $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "Main menu" --textbox $TMP_FILE 30 135
+    $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "OK" --textbox $TMP_FILE 30 135
 }
 
 menu_fw_update() {
