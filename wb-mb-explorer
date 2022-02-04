@@ -22,6 +22,7 @@ SIG_TERM=15
 
 TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
 trap "rm -f $TMP_FILE" $SIG_NONE $SIG_HUP $SIG_QUIT $SIG_KILL $SIG_TERM
+trap "echo \"Ctrl-C was pressed\" " $SIG_INT
 
 # exit confirmation window
 show_exit_dialog() {
@@ -476,11 +477,10 @@ network_scan() {
     local b
     local p
     local s
-    local scan_result
+    local device_address
     local device_model
     local serial_number
     local fw_version
-
     local progress=0
 
     local scan_baudrate="9600 115200 19200 57600 38400 4800 2400 1200"
@@ -488,7 +488,7 @@ network_scan() {
     local scan_addr_last=247
     local scan_parity="none odd even"
     local scan_stopbits="1 2"
-    local scan_quantity=11808
+    local scan_quantity=11856
     local dialog_title="COMPLETE DEVICE SCAN"
 
     case "$1" in
@@ -500,30 +500,29 @@ network_scan() {
 
         write_log "+++++ COMM SETTINGS SCAN"
         echo "Scan results (comm settings scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-        echo "Port = $COM_PORT Address = $MB_ADDRESS " >>$TMP_FILE
+        echo -e "Port = $COM_PORT Address = $MB_ADDRESS\n" >>$TMP_FILE
         ;;
     "address")
         scan_baudrate=$BAUDRATE
         scan_parity=$PARITY
         scan_stopbits=$STOPBITS
         scan_quantity=247
-        dialog_title="ADDRESSES SCAN"
+        dialog_title="SCAN OF ADDRESSES"
 
-        write_log "+++++ ADDRESS SCAN"
-        echo "Scan results (address scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-        echo "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS " >>$TMP_FILE
+        write_log "+++++ SCAN OF ADDRESSES"
+        echo "Scan results (scan of addresses)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
+        echo -e "Port = $COM_PORT Baudrate = $BAUDRATE, Parity = $PARITY, Stop bits = $STOPBITS\n" >>$TMP_FILE
         ;;
     "complete")
         write_log "+++++ COMPLETE NETWORK SCAN"
         echo "Scan results (complete network scan)" $(date +"%Y-%m-%d %H:%M") >$TMP_FILE
-        echo "Port = $COM_PORT " >>$TMP_FILE
+        echo -e "Port = $COM_PORT\n" >>$TMP_FILE
         ;;
     *) return 1 ;;
     esac
 
-    echo -e "------------------------------------------------------------\n" >>$TMP_FILE
-
     stop_serial_driver
+    echo -e "  Address | Device_model | Serial_number | FW_version | Boudrate | Parity | Stopbits\n" >>$TMP_FILE
 
     (
         for b in $scan_baudrate; do
@@ -534,40 +533,30 @@ network_scan() {
 
                         echo "XXX"
                         echo $(($progress * 100 / $scan_quantity))
-                        echo -e "\nScan for devices using Port = $COM_PORT"
-                        echo " Address = $a, Baudrate = $b, Parity = $p, Stop bits = $s\n\n"
-                        echo "Scan log (last 6 results):"
-                        echo "------------------------------------------------------------\n\n"
-                        tail -n6 $TMP_FILE
+                        echo -e "Scan for devices using Port = $COM_PORT"
+                        echo -e " Address = $a, Baudrate = $b, Parity = $p, Stop bits = $s\n"
+                        tail -n16 $TMP_FILE
                         echo "XXX"
 
-                        scan_result=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
-                        scan_result=$(value_hex_to_dec $scan_result)
-                        if [[ ("$scan_result" -ge "1") && ("$scan_result" -le "247") ]]; then
+                        device_address=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                        device_address=$(value_hex_to_dec $device_address)
+                        if [[ ("$device_address" -ge "1") && ("$device_address" -le "247") ]]; then
                             device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
-
                             serial_number=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r270 -c2 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
                             serial_number=$(value_hex_to_dec $serial_number)
                             if [[ -n $(echo $device_model | grep MAP) ]]; then
                                 serial_number=$(($serial_number - 4261412864))
                             fi
-
                             fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
-
-                            echo "Address = $a, Device model = $device_model, Serial = $serial_number, FW version = $fw_version, Boudrate = $b, Parity = $p, Stopbits = $s" >>$TMP_FILE
+                            echo -e "    $a | $device_model | $serial_number | $fw_version | $b | $p | $s" >>$TMP_FILE
                         fi
                         sleep 0.01
-
                     done
-
                 done
-
             done
-
         done
-
     ) |
-        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 25 135 5
+        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 30 135 5
 
     write_log "$(cat $TMP_FILE)"
     $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "OK" --textbox $TMP_FILE 30 135
@@ -730,6 +719,7 @@ update_fw_using_file() {
             if [[ -f $fw_file && -n $(echo $fw_file | grep ".wbfw") ]]; then
                 echo "Firmware file:" $fw_file >>$TMP_FILE
                 $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Start" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
+
                 case $? in
                 $DIALOG_OK)
 
@@ -743,6 +733,7 @@ update_fw_using_file() {
                 echo -e "\n--------------------------------------" >>$TMP_FILE
                 echo -e "Device info after FW update:\n" >>$TMP_FILE
                 local tmp_info=$(cat $TMP_FILE)
+
                 read_device_info
 
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
