@@ -30,9 +30,10 @@ show_exit_dialog() {
     case $? in
     $DIALOG_OK)
         if [[ "$serial_driver_was_running" = "1" ]]; then
-            echo "Starting service wb-mqtt-serial"
+            show_info_box "\n       Starting service wb-mqtt-serial"
             systemctl start wb-mqtt-serial
         fi
+        clear
         exit
         ;;
     esac
@@ -50,6 +51,10 @@ show_help() {
 
 show_yes_no_dialog() {
     $DIALOG --title "$1" --yesno "\n    $2" 15 61
+}
+
+show_info_box() {
+    $DIALOG --title "INFO" --infobox "$1" 5 50
 }
 
 read_communication_settings() {
@@ -820,7 +825,7 @@ menu_main() {
 stop_serial_driver() {
 
     if [[ "$(systemctl is-active wb-mqtt-serial)" = "active" ]]; then
-        echo "Stopping service wb-mqtt-serial"
+        show_info_box "\n       Stopping service wb-mqtt-serial"
         systemctl stop wb-mqtt-serial
     fi
 }
