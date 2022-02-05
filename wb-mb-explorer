@@ -482,6 +482,7 @@ network_scan() {
     local b
     local p
     local s
+    local scan_result
     local device_address
     local device_model
     local serial_number
@@ -543,7 +544,17 @@ network_scan() {
                         tail -n16 $TMP_FILE
                         echo "XXX"
 
-                        device_address=$(modbus_client -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
+                        sleep 0.01
+                        scan_result=$(modbus_client --debug -mrtu $COM_PORT -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r128 2>&1)
+
+                        #check for answer with error -> unknown Modbus device
+                        if [[ -n "$(echo -e $scan_result | grep "ERROR Illegal")" ]]; then
+                            echo -e "    $a | Unknown Modbus device | | | $b | $p | $s" >>$TMP_FILE
+                            continue
+                        fi
+
+                        #check for answer without error -> Wirenboard Modbus device
+                        device_address=$(echo -e $scan_result | grep Data: | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
                         device_address=$(value_hex_to_dec $device_address)
                         if [[ ("$device_address" -ge "1") && ("$device_address" -le "247") ]]; then
                             device_model=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r200 -c6 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
@@ -555,9 +566,11 @@ network_scan() {
                             fw_version=$(echo -e "$(modbus_client -mrtu $COM_PORT --debug -o100 -a$a -b$b -s$s -d8 -p$p -t4 -r250 -c16 2>/dev/null | grep Data: | sed -e 's/.*Data: //' -e 's/0x00/\\\x/g' -e 's/\s//g')" | tr -d "\0")
                             echo -e "    $a | $device_model | $serial_number | $fw_version | $b | $p | $s" >>$TMP_FILE
                         fi
-                        sleep 0.01
+
                     done
+
                 done
+
             done
         done
     ) |
