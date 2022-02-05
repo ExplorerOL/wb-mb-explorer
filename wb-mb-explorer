@@ -597,23 +597,26 @@ menu_fw_update() {
         Chose action to do" 30 120 8 \
             "Device FW update" "Update firmware of device with address $MB_ADDRESS at port $COM_PORT from repository" \
             "Force device FW update" "Force update FW of device with address $MB_ADDRESS at port $COM_PORT from repository" \
+            "Recover device FW" "Recover firmware of device with address $MB_ADDRESS at port $COM_PORT from repository" \
             "Update FW of all devices" "Update FW of all devices configured in controller from repository" \
             "Update FW using file" "Update FW of device with address $MB_ADDRESS at port $COM_PORT using file" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
             case $(cat $TMP_FILE) in
-            "Device FW update") update_device_fw_from_internet ;;
-            "Force device FW update") update_device_fw_from_internet "--force" ;;
+            "Device FW update") update_device_fw_from_internet "update-fw" ;;
+            "Force device FW update") update_device_fw_from_internet "update-fw --force" ;;
+            "Recover device FW") update_device_fw_from_internet "recover" ;;
             "Update FW of all devices") update_all_devices_fw_from_internet ;;
             "Update FW using file") update_fw_using_file ;;
             esac
             ;;
         $DIALOG_HELP)
             show_help "HELP" "\n
-        Device FW update - updates FW of device with current communication settings.\n
+        Device FW update - updates FW of device with current address\n
                            The newest version of firmware is downloaded from internet automatically\n\n
         Force device FW update - like Device FW update, but reflashes device even it has the newest FW version already\n\n
+        Recover device FW - recovers FW of device with current address. Use it if device is in bootloader mode\n\n
         Update FW of all devices - like Device FW update, but for ALL devices configured in Wirenboard controller\n\n
         Update FW using file - updates FW of device with current communication settings using specified FW file\n"
             ;;
@@ -626,19 +629,34 @@ menu_fw_update() {
 update_device_fw_from_internet() {
     stop_serial_driver
 
-    local window_title="DEVICE FW UPDATE"
-    local button_title="Update firmware"
+    local window_title=""
+    local button_title=""
 
-    if [[ "$1" = "--force" ]]; then
+    case "$1" in
+    "update-fw")
+        window_title="DEVICE FW UPDATE"
+        button_title="Update firmware"
+        ;;
+    "update-fw --force")
         window_title="FORCE DEVICE FW UPDATE"
         button_title="Force firmware update"
-    fi
+        ;;
+    "recover")
+        window_title="DEVICE FW RECOVER"
+        button_title="Recover firmware"
+        ;;
+    *) return 1 ;;
+    esac
 
     write_log "+++++ $window_title"
+    echo "" >$TMP_FILE
 
-    echo -e "Device info before "${1##--} "FW update:\n" >$TMP_FILE
-    read_device_info
-    echo -e "--------------------------------------\n" >>$TMP_FILE
+    if [[ "$1" != "recover" ]]; then
+        echo -e "Device info before "${1##--} "FW update:\n" >>$TMP_FILE
+        read_device_info
+        echo -e "--------------------------------------\n" >>$TMP_FILE
+    fi
+
     echo -e "                                                 Attention!!!\n
                     Firmware updating process may take up to several minutes.\n
                     Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
@@ -648,7 +666,7 @@ update_device_fw_from_internet() {
     case $? in
     $DIALOG_OK)
 
-        wb-mcu-fw-updater update-fw -a$MB_ADDRESS $COM_PORT $1 2>&1 | tee -a $TMP_FILE
+        wb-mcu-fw-updater $1 -a$MB_ADDRESS $COM_PORT 2>&1 | tee -a $TMP_FILE
         sleep 2
         sed -i -e 's/[[:cntrl:]]//g' -e 's/\[......//g' -e 's/\[..//g' $TMP_FILE
 
@@ -789,7 +807,7 @@ menu_main() {
                 Modbus register type: $MB_REG_TYPE \n\
                 \n\n\
      
-            Choose action to do                     " 28 100 8 \
+            Choose action to do                     " 30 100 8 \
             "1 Settings" "set communication settings" \
             "2 Show device info" "read information about device" \
             "3 Read/write register" "read/write register using current settings" \
