@@ -20,6 +20,23 @@ SIG_TRAP=5
 SIG_KILL=9
 SIG_TERM=15
 
+COM_PORT=/dev/ttyRS485-1
+BAUDRATE=9600
+PARITY=none
+STOPBITS=2
+MB_ADDRESS=1
+MB_REGISTER=128
+MB_REG_TYPE=holding
+
+WB_REG_BAUDRATE=110
+WB_REG_PARITY=111
+WB_REG_STOPBITS=112
+WB_REG_REBOOT=120
+WB_REG_ADDRESS=128
+WB_REG_BOOTLOADER=129
+
+retval=""
+
 TMP_FILE=$(mktemp /tmp/wb-mb-explorer.XXXXXX)
 trap "rm -f $TMP_FILE" $SIG_NONE $SIG_HUP $SIG_QUIT $SIG_KILL $SIG_TERM
 trap "echo \"Ctrl-C was pressed\" " $SIG_INT
@@ -71,13 +88,6 @@ read_communication_settings() {
     else
 
         show_msg_box "INFO" "Configuration file not found! Default settings will be applied"
-        COM_PORT=/dev/ttyRS485-1
-        BAUDRATE=9600
-        PARITY=none
-        STOPBITS=2
-        MB_ADDRESS=1
-        MB_REGISTER=128
-        MB_REG_TYPE=holding
 
         save_communication_settings
 
@@ -120,10 +130,10 @@ set_communication_settings() {
         case $? in
         $DIALOG_OK) case $(cat ${TMP_FILE}) in
         "Set port") set_com_port ;;
-        "Set baudrate") set_baudrate ;;
-        "Set parity") set_parity ;;
-        "Set stopbits") set_stopbits ;;
-        "Set device address") set_address ;;
+        "Set baudrate") set_baudrate_dialog BAUDRATE ;;
+        "Set parity") set_parity_dialog PARITY ;;
+        "Set stopbits") set_stopbits_dialog STOPBITS ;;
+        "Set device address") set_address_dialog MB_ADDRESS ;;
         "Set Modbus register") set_mb_register ;;
         "Set register type") set_mb_register_type ;;
         esac ;;
@@ -145,7 +155,7 @@ set_com_port() {
     fi
 }
 
-set_baudrate() {
+set_baudrate_dialog() {
     $DIALOG --title "Baudrate" --radiolist "Choose avaliable option for baudrate:" 20 61 7 \
         "1200" "bit/s" off \
         "4800" "bit/s" off \
@@ -158,37 +168,37 @@ set_baudrate() {
     case $? in
     $DIALOG_OK)
         case $(cat ${TMP_FILE}) in
-        "1200") BAUDRATE="1200" ;;
-        "4800") BAUDRATE="4800" ;;
-        "9600") BAUDRATE="9600" ;;
-        "19200") BAUDRATE="19200" ;;
-        "38400") BAUDRATE="38400" ;;
-        "57600") BAUDRATE="57600" ;;
-        "115200") BAUDRATE="115200" ;;
+        "1200") eval $1="1200" ;;
+        "4800") eval $1="4800" ;;
+        "9600") eval $1="9600" ;;
+        "19200") eval $1="19200" ;;
+        "38400") eval $1="38400" ;;
+        "57600") eval $1="57600" ;;
+        "115200") eval $1="115200" ;;
         esac
         ;;
     esac
-
+    #sleep 5
 }
 
-set_parity() {
+set_parity_dialog() {
     $DIALOG --title "Parity" --radiolist "Choose avaliable option for parity:" 20 61 5 \
-        "N" "None" ON \
-        "E" "Even" off \
-        "O" "Odd" off 2>$TMP_FILE
+        "N" "none" ON \
+        "O" "odd" off \
+        "E" "even" off 2>$TMP_FILE
 
     case $? in
     $DIALOG_OK)
         case $(cat ${TMP_FILE}) in
-        "N") PARITY="none" ;;
-        "E") PARITY="even" ;;
-        "O") PARITY="odd" ;;
+        "N") eval $1="none" ;;
+        "O") eval $1="odd" ;;
+        "E") eval $1="even" ;;
         esac
         ;;
     esac
 }
 
-set_stopbits() {
+set_stopbits_dialog() {
     $DIALOG --title "Stopbits" --radiolist "Choose avaliable option for stopbits:" 20 61 5 \
         "1" "1 stop bit" off \
         "2" "2 stop bits" ON 2>$TMP_FILE
@@ -196,22 +206,22 @@ set_stopbits() {
     case $? in
     $DIALOG_OK)
         case $(cat ${TMP_FILE}) in
-        "1") STOPBITS="1" ;;
-        "2") STOPBITS="2" ;;
+        "1") eval $1="1" ;;
+        "2") eval $1="2" ;;
         esac
         ;;
     esac
 
 }
 
-set_address() {
+set_address_dialog() {
     $DIALOG --title "Enter address of Modbus device" --inputbox "Enter address of Modbus device you wnat to work with (from 1 to 247)" 16 51 2>$TMP_FILE
 
     case $? in
     $DIALOG_OK)
         local value=$(cat ${TMP_FILE})
         if [[ ("$value" -ge "0") && ("$value" -le "247") && ("$value%1" -eq "0") && ("$value" -ne "") ]]; then
-            MB_ADDRESS=$value
+            eval $1=$value
         else
             show_msg_box "ERROR" "Entered device address is incorrect!"
         fi
@@ -253,13 +263,14 @@ modbus_read_raw() {
 }
 
 modbus_write() {
-    modbus_client --debug -mrtu $COM_PORT -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$MBFunction -r$MB_REGISTER $1 2>&1
+    # args: $1=mb_function $2=reg_address $3=value
+    modbus_client --debug -mrtu $COM_PORT -o100 -a$MB_ADDRESS -b$BAUDRATE -s$STOPBITS -d8 -p$PARITY -t$1 -r$2 $3 2>&1
 }
 
-#Function of reading hex value from Modbus register
-#   If reading was successfull - hex value is returned
-#   If reading was unsuccessfull - return complete command output
 modbus_read_hex_value() {
+    #Function of reading hex value from Modbus register
+    #   If reading was successfull - hex value is returned
+    #   If reading was unsuccessfull - return complete command output
     readRawResult=$(modbus_read_raw $1 $2 $3 $4)
     readHexValue=$(echo "$readRawResult" | grep Data | sed -e 's/.*Data: //' -e 's/0x//g' -e 's/\s//g')
     if [[ -n $readHexValue ]]; then
@@ -365,13 +376,13 @@ read_register() {
         echo -e "\nResult: \n" >>$TMP_FILE
 
         case $MB_REG_TYPE in
-        "coil") MBFunction="0x01" ;;
-        "descrete") MBFunction="0x02" ;;
-        "holding") MBFunction="0x03" ;;
-        "input") MBFunction="0x04" ;;
+        "coil") MB_FUNCTION="0x01" ;;
+        "descrete") MB_FUNCTION="0x02" ;;
+        "holding") MB_FUNCTION="0x03" ;;
+        "input") MB_FUNCTION="0x04" ;;
         esac
 
-        local readResult=$(modbus_read_hex_value $MB_ADDRESS $MBFunction $MB_REGISTER 1)
+        local readResult=$(modbus_read_hex_value $MB_ADDRESS $MB_FUNCTION $MB_REGISTER 1)
 
         if [[ -z $(echo $readResult | grep ERROR) ]]; then
             echo "Read data (hex): 0x$readResult" >>$TMP_FILE
@@ -404,8 +415,8 @@ write_register() {
     write_log "+++++ WRITE REGISTER"
 
     case $MB_REG_TYPE in
-    "coil") MBFunction="0x05" ;;
-    "holding") MBFunction="0x06" ;;
+    "coil") MB_FUNCTION="0x05" ;;
+    "holding") MB_FUNCTION="0x06" ;;
     "descrete" | "input")
         show_msg_box "ERROR" "Register type is $MB_REG_TYPE, can't write!"
         return
@@ -417,12 +428,12 @@ write_register() {
     local input_value="$(cat $TMP_FILE)"
 
     if [[ "$input_value" -ge "0" && "$input_value" -le "65535" && -n "$input_value" ]]; then
-        local writeResult=$(modbus_write $input_value)
+        local write_result=$(modbus_write $MB_FUNCTION $MB_REGISTER $input_value)
 
-        if [[ -n "$(echo $writeResult | grep SUCCESS)" ]]; then
+        if [[ -n "$(echo $write_result | grep SUCCESS)" ]]; then
             echo -e "\nData $input_value was successfully written to register $MB_REGISTER" >$TMP_FILE
         else
-            echo -e "\nError writing register!!!\n\n$writeResult" >$TMP_FILE
+            echo -e "\nError writing register!!!\n\n$write_result" >$TMP_FILE
 
         fi
 
@@ -435,6 +446,246 @@ write_register() {
     fi
 
     write_log "$(cat $TMP_FILE)"
+}
+
+modbus_write_param() {
+    #args: $1=wb_reg $2=value
+    local write_result=$(modbus_write 6 $1 $2 2>&1)
+    #echo $write_result
+    sleep 1
+    if [[ (-n "$(echo $write_result | grep SUCCESS)") || ($MB_ADDRESS == "0") ]]; then
+        echo -e "\n                     Command was successfully executed!" >$TMP_FILE
+    else
+        echo -e "\n                     Error during executing command!!!\n\n$write_result" >$TMP_FILE
+
+    fi
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "COMMAND EXECUTING RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
+}
+
+menu_device_setup() {
+    local tmp_arg
+
+    while [ 1 ]; do
+        retval=""
+        read_device_info
+        local current_device_info="$(cat $TMP_FILE | grep "Device model\|Serial number")"
+
+        if [[ -z "$current_device_info" ]]; then
+            current_device_info=$(echo "Device is unavailable!")
+        fi
+
+        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "DEVICE SETUP" \
+            --menu "\n 
+    Comm settings:\n 
+        Port:$COM_PORT Address:$MB_ADDRESS Baudrate:$BAUDRATE Parity:$PARITY Stopbits:$STOPBITS\n\n
+    Device for setup:\n
+        $current_device_info
+        \n\n\
+        Chose action to do" 30 120 8 \
+            "Set address" "Sets device Modbus address" \
+            "Set baudrate" "Sets device baudrate" \
+            "Set parity" "Sets device parity" \
+            "Set stopbits" "Sets device stopbits" \
+            "Reboot device" "Sends command to reboot device" \
+            "Jump into bootloader mode" "Sends command to jump into bootloader" \
+            "Reset device address to 1" "Sends broadcast command to reset all devices addresses to 1" \
+            "Reset device comm settings" "Turns off and on device and resets comm settings to default" \
+            2>$TMP_FILE
+
+        case $? in
+        $DIALOG_OK)
+            case $(cat $TMP_FILE) in
+            "Set address")
+                set_address_dialog retval
+                if [[ "$retval" != "" ]]; then
+                    modbus_write_param $WB_REG_ADDRESS $retval
+                    show_yes_no_dialog "PROMPT" \
+                        "
+            Do you want to change device address\n \
+            in current device settings to $retval?"
+                    case $? in
+                    $DIALOG_OK)
+                        MB_ADDRESS=$retval
+                        save_communication_settings
+                        ;;
+                    esac
+                fi
+                ;;
+            "Set baudrate")
+                set_baudrate_dialog retval
+                if [[ "$retval" != "" ]]; then
+                    tmp_arg=$(($retval / 100))
+                    modbus_write_param $WB_REG_BAUDRATE $tmp_arg
+                    show_yes_no_dialog "PROMPT" \
+                        "
+            Do you want to change baudrate\n \
+            in current comm settings to $retval?"
+                    case $? in
+                    $DIALOG_OK)
+                        BAUDRATE=$retval
+                        save_communication_settings
+                        ;;
+                    esac
+                fi
+
+                ;;
+
+            "Set parity")
+                set_parity_dialog retval
+                if [[ "$retval" != "" ]]; then
+                    case "$retval" in
+                    "none") tmp_arg=0 ;;
+                    "odd") tmp_arg=1 ;;
+                    "even") tmp_arg=2 ;;
+                    esac
+                    modbus_write_param $WB_REG_PARITY $tmp_arg
+
+                    show_yes_no_dialog "PROMPT" \
+                        "
+            Do you want to change parity\n \
+            in current comm settings to $retval?"
+                    case $? in
+                    $DIALOG_OK)
+                        PARITY=$retval
+                        save_communication_settings
+                        ;;
+                    esac
+                fi
+                ;;
+
+            "Set stopbits")
+                set_stopbits_dialog retval
+                if [[ "$retval" != "" ]]; then
+                    modbus_write_param $WB_REG_STOPBITS $retval
+
+                    show_yes_no_dialog "PROMPT" \
+                        "
+            Do you want to change stopbits\n \
+            in current comm settings to $retval?"
+                    case $? in
+                    $DIALOG_OK)
+                        STOPBITS=$retval
+                        save_communication_settings
+                        ;;
+                    esac
+                fi
+                ;;
+
+            "Reboot device")
+                modbus_write_param $WB_REG_REBOOT 1
+                ;;
+            "Jump into bootloader mode")
+                modbus_write_param $WB_REG_BOOTLOADER 1
+                ;;
+            "Reset device address to 1")
+                show_yes_no_dialog "WARNING" \
+                    "
+                       Attention!\n \
+      Addresses of ALL DEVICES connected to port \n \
+          $COM_PORT will be reset to 1!!!\n \
+                     Are yous sure?"
+                case $? in
+                $DIALOG_OK)
+                    local tmp_addr=$MB_ADDRESS
+                    MB_ADDRESS=0
+                    modbus_write_param $WB_REG_ADDRESS 1
+                    MB_ADDRESS=$tmp_addr
+
+                    show_yes_no_dialog "PROMPT" \
+                        "
+            Do you want to change device address\n \
+            in current device settings to 1?"
+                    case $? in
+                    $DIALOG_OK)
+                        MB_ADDRESS=1
+                        save_communication_settings
+                        ;;
+                    esac
+
+                    ;;
+
+                esac
+                ;;
+
+            "Reset device comm settings")
+                show_yes_no_dialog "WARNING" \
+                    "
+                        Attention!\n \
+        Addresses and communication settings \n \
+        of ALL DEVICES connected to port \n \
+        $COM_PORT will be reset to default!!!\n \
+                      Are yous sure ?"
+
+                case $? in
+                $DIALOG_OK)
+
+                    show_info_box "\n       Turning controller V_OUT to OFF..."
+                    mosquitto_pub -t '/devices/wb-gpio/controls/V_OUT/on' -r -m 0
+                    sleep 3
+                    show_info_box "       Turning controller V_OUT to ON...\nTurn on device power supply if it is externally powered!"
+                    mosquitto_pub -t '/devices/buzzer/controls/frequency/on' -r -m 3000
+                    mosquitto_pub -t '/devices/buzzer/controls/volume/on' -r -m 50
+                    mosquitto_pub -t '/devices/buzzer/controls/enabled/on' -r -m 1
+                    mosquitto_pub -t '/devices/wb-gpio/controls/V_OUT/on' -r -m 1
+
+                    sleep 1.2
+                    show_info_box "\n       Sending reset command..."
+                    mosquitto_pub -t '/devices/buzzer/controls/enabled/on' -r -m 0
+                    wb-mcu-fw-flasher -d $COM_PORT -a0 -u
+
+                    sleep 2
+                    show_info_box "\n       Reset comm settings command was sent..."
+
+                    show_info_box "\n       Turn controller V_OUT to OFF to reboot device..."
+                    mosquitto_pub -t '/devices/wb-gpio/controls/V_OUT/on' -r -m 0
+                    sleep 2
+                    show_info_box "\n       Turn controller V_OUT to ON"
+                    mosquitto_pub -t '/devices/wb-gpio/controls/V_OUT/on' -r -m 1
+                    sleep 2
+                    show_info_box "\n       Procedure finished!"
+                    sleep 2
+
+                    show_yes_no_dialog "PROMPT" \
+                        "
+            Do you want to change comm settings\n \
+                    to default falues?"
+                    case $? in
+                    $DIALOG_OK)
+                        MB_ADDRESS=1
+                        BAUDRATE="9600"
+                        PARITY="none"
+                        STOPBITS=2
+                        save_communication_settings
+                        ;;
+                    esac
+
+                    ;;
+
+                esac
+                ;;
+            esac
+
+            ;;
+
+        $DIALOG_HELP)
+            show_help "DEVICE SETUP HELP" "\n
+            Set address  - sets device Modbus address using current communications settings\
+            Set baudrate - sets device baudrate using current communications settings\
+            Set parity - sets device parity using current communications settings\
+            Set stopbits - sets device stopbits using current communications settings\
+            Reboot device - sends command to reboot device using current communications settings\
+            Jump into bootloader mode - sends command to jump into bootloader \
+            Reset device address to 1 - sends broadcast command to reset all devices addresses to 1 \
+            Reset device comm settings - turns off and on device and resets comm settings to default.\
+                                         If device is powered from V_OUT terminal this procedure will be \
+                                         automatic.
+                                         If device is externally powered turn off power before procedure.\
+                                         Turn on power on when the buzzer will sound. After procedure device \
+                                         should be rebooted turning off and on power manually again"
+            ;;
+        *) return ;;
+        esac
+    done
 }
 
 menu_network_scan() {
@@ -808,12 +1059,13 @@ menu_main() {
                 \n\n\
      
             Choose action to do                     " 30 100 8 \
-            "1 Settings" "set communication settings" \
-            "2 Show device info" "read information about device" \
-            "3 Read/write register" "read/write register using current settings" \
-            "4 Network scan" "network scan for Wirenboard devices" \
-            "5 FW update" "device firmware update" \
-            "6 Show log file" "show log file of current session" 2>$TMP_FILE
+            "1 Settings" "Set communication settings" \
+            "2 Show device info" "Read information about device" \
+            "3 Read/write register" "Read/write register using current settings" \
+            "4 Device setup" "Configure Modbus device" \
+            "5 Network scan" "Network scan for Wirenboard devices" \
+            "6 FW update" "Device firmware update" \
+            "7 Show log file" "Show log file of current session" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
@@ -821,9 +1073,10 @@ menu_main() {
             "1 Settings") set_communication_settings ;;
             "2 Show device info") show_device_info ;;
             "3 Read/write register") read_register ;;
-            "4 Network scan") menu_network_scan ;;
-            "5 FW update") menu_fw_update ;;
-            "6 Show log file") show_log_file ;;
+            "4 Device setup") menu_device_setup ;;
+            "5 Network scan") menu_network_scan ;;
+            "6 FW update") menu_fw_update ;;
+            "7 Show log file") show_log_file ;;
             *) menu_main ;;
             esac
             ;;
@@ -837,9 +1090,10 @@ menu_main() {
             2 Show device info - reads most importand Wirenboard device information (device model, firmware version and etc.)\n
             3 Read/write register - allows user to read and write register of Modbus device using current \n
                                     communication settings\n
-            4 Network scan - scanning network for Wirenboard devices\n                        
-            5 FW update - allows to update firmwares of Wirenboard devices\n
-            6 Show log file - shows log file of current programm session\n\n
+            4 Device setup - allows to setup device with current settings (set baudrate, address, reset settings to default)\n
+            5 Network scan - scanning network for Wirenboard devices\n                        
+            6 FW update - allows to update firmwares of Wirenboard devices\n
+            7 Show log file - shows log file of current programm session\n\n
     To switch between menu items use Up and Down keys, for selecting answer buttons use TAB key or Left and Right keys.\n
     For filenames completion in selecting files dialogs use SPACE key."
             ;;
