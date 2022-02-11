@@ -1,3 +1,9 @@
+wb-mb-explorer (1.2.2) stable; urgency=medium
+
+  * Labels and help text were improved
+
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Fri, 11 Feb 2022 18:45:31 +0300
+
 wb-mb-explorer (1.2.1) stable; urgency=medium
 
   * Register address 0 can be set in Settings

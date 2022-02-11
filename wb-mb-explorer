@@ -451,7 +451,6 @@ write_register() {
 modbus_write_param() {
     #args: $1=wb_reg $2=value
     local write_result=$(modbus_write 6 $1 $2 2>&1)
-    #echo $write_result
     sleep 1
     if [[ (-n "$(echo $write_result | grep SUCCESS)") || ($MB_ADDRESS == "0") ]]; then
         echo -e "\n                     Command was successfully executed!" >$TMP_FILE
@@ -488,8 +487,8 @@ menu_device_setup() {
             "Set stopbits" "Sets device stopbits" \
             "Reboot device" "Sends command to reboot device" \
             "Jump into bootloader mode" "Sends command to jump into bootloader" \
-            "Reset device address to 1" "Sends broadcast command to reset all devices addresses to 1" \
-            "Reset device comm settings" "Turns off and on device and resets comm settings to default" \
+            "Reset device address to 1" "Resets addresses of ALL DEVICES connected to port $COM_PORT to 1" \
+            "Reset device comm settings" "Resets comm settings of ALL DEVICES connected to port $COM_PORT to default" \
             2>$TMP_FILE
 
         case $? in
@@ -669,18 +668,19 @@ menu_device_setup() {
 
         $DIALOG_HELP)
             show_help "DEVICE SETUP HELP" "\n
-            Set address  - sets device Modbus address using current communications settings\
-            Set baudrate - sets device baudrate using current communications settings\
-            Set parity - sets device parity using current communications settings\
-            Set stopbits - sets device stopbits using current communications settings\
-            Reboot device - sends command to reboot device using current communications settings\
-            Jump into bootloader mode - sends command to jump into bootloader \
-            Reset device address to 1 - sends broadcast command to reset all devices addresses to 1 \
-            Reset device comm settings - turns off and on device and resets comm settings to default.\
-                                         If device is powered from V_OUT terminal this procedure will be \
-                                         automatic.
-                                         If device is externally powered turn off power before procedure.\
-                                         Turn on power on when the buzzer will sound. After procedure device \
+            Set address  - sets device Modbus address using current communications settings\n\n\
+            Set baudrate - sets device baudrate using current communications settings\n\n\
+            Set parity - sets device parity using current communications settings\n\n\
+            Set stopbits - sets device stopbits using current communications settings\n\n\
+            Reboot device - sends command to reboot device using current communications settings\n\n\
+            Jump into bootloader mode - sends command to jump into bootloader\n\n\
+            Reset device address to 1 - sends command to reset addresses of ALL DEVICES connected to selected port to 1\n\n\
+            Reset device comm settings - turns off and on power at V_OUT terminals and resets comm settings\n\
+                                         of ALL DEVICES connected to selected port to default (9600 8N2). \n\
+                                         If device is powered from V_OUT terminal this procedure will be\n\
+                                         automatic.\n\
+                                         If device is externally powered turn off power before procedure.\n\
+                                         Turn on power on when the buzzer will sound. After procedure device \n\
                                          should be rebooted turning off and on power manually again"
             ;;
         *) return ;;
