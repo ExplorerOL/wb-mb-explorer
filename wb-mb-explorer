@@ -237,7 +237,7 @@ set_mb_register() {
     case $? in
     $DIALOG_OK)
         local value=$(cat ${TMP_FILE})
-        if [[ ("$value" -ge "1") && ("$value" -le "65535") && ("$value" -ne "") ]]; then
+        if [[ ("$value" -ge "0") && ("$value" -le "65535") && ("$value" != "") ]]; then
             MB_REGISTER=$(cat $TMP_FILE)
         else
             show_msg_box "ERROR" "Entered device register number is incorrect!"

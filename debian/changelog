@@ -1,3 +1,9 @@
+wb-mb-explorer (1.2.1) stable; urgency=medium
+
+  * Register address 0 can be set in Settings
+
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Fri, 11 Feb 2022 17:42:29 +0300
+
 wb-mb-explorer (1.2.0) stable; urgency=medium
 
   * Item "Device setup" with options was added into main menu
