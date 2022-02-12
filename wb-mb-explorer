@@ -104,16 +104,17 @@ save_communication_settings() {
     echo MB_REG_TYPE:$MB_REG_TYPE >>$SETTINGS_FILE
 }
 
-set_communication_settings() {
+menu_settings() {
     while [ 1 ]; do
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "COMMUNICATIONS SETTINGS" --clear --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
+        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "SETTINGS" --clear --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
             --menu "\n
             Current communication settings: \n\
                 Port: $COM_PORT \n\
                 Baudrate: $BAUDRATE \n\
                 Parity: $PARITY \n\
-                Stopbits: $STOPBITS \n\
-                Device address: $MB_ADDRESS \n\
+                Stopbits: $STOPBITS \n\n\
+            Current device settings: \n\
+                Address: $MB_ADDRESS \n\
                 Modbus register: $MB_REGISTER \n\
                 Modbus register type: $MB_REG_TYPE \n\
                 \n\n\
@@ -475,7 +476,7 @@ menu_device_setup() {
 
         ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "DEVICE SETUP" \
             --menu "\n 
-    Comm settings:\n 
+    Current communication settings:\n 
         Port:$COM_PORT Address:$MB_ADDRESS Baudrate:$BAUDRATE Parity:$PARITY Stopbits:$STOPBITS\n\n
     Device for setup:\n
         $current_device_info
@@ -1070,7 +1071,7 @@ menu_main() {
         case $? in
         $DIALOG_OK)
             case $(cat $TMP_FILE) in
-            "1 Settings") set_communication_settings ;;
+            "1 Settings") menu_settings ;;
             "2 Show device info") show_device_info ;;
             "3 Read/write register") read_register ;;
             "4 Device setup") menu_device_setup ;;
