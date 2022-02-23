@@ -1,3 +1,14 @@
+wb-mb-explorer (1.2.4) stable; urgency=medium
+
+  * Small interface changements:
+        - Warning text changement
+        - Title of yes/no dialog was changed to CONFIRMATION
+        - Backtitle was added to dialogs
+        - Text RTU was added for certainty
+        - Initial progress indicator status changed to 0
+
+ -- Dmitry Vorobjev <d.vorobjev@wirenboard.ru>  Wed, 23 Feb 2022 18:12:05 +0300
+
 wb-mb-explorer (1.2.3) stable; urgency=medium
 
   * Small code refactoring and text changements

@@ -4,7 +4,7 @@ SETTINGS_FILE="/etc/wb-mb-explorer.conf"
 LOG_FILE="/var/log/wb-mb-explorer.log"
 
 DIALOG="dialog"
-DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for diagnostics and configuring Wirenboard devices with Modbus")
+DIALOG_BACKTITLE=$(echo "WB-MB-EXPLORER - tool for diagnostics and configuring Wirenboard devices with Modbus RTU")
 DIALOG_OK=0
 DIALOG_CANCEL=1
 DIALOG_HELP=2
@@ -43,7 +43,8 @@ trap "echo \"Ctrl-C was pressed\" " $SIG_INT
 
 # exit confirmation window
 show_exit_dialog() {
-    $DIALOG --yesno "\n            $1" 7 50
+    show_yes_no_dialog "CONFIRMATION" "             $1"
+
     case $? in
     $DIALOG_OK)
         if [[ "$serial_driver_was_running" = "1" ]]; then
@@ -58,20 +59,20 @@ show_exit_dialog() {
 
 # show message box
 show_msg_box() {
-    $DIALOG --title "$1" --msgbox "\n    $2" 20 80
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$1" --msgbox "\n    $2" 20 80
 }
 
 # show help
 show_help() {
-    $DIALOG --title "$1" --msgbox "\n    $2" 30 150
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$1" --msgbox "\n    $2" 30 150
 }
 
 show_yes_no_dialog() {
-    $DIALOG --title "$1" --yesno "\n    $2" 15 61
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$1" --yesno "\n    $2" 15 61
 }
 
 show_info_box() {
-    $DIALOG --title "INFO" --infobox "$1" 5 50
+    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "INFO" --infobox "$1" 5 50
 }
 
 read_communication_settings() {
@@ -499,7 +500,7 @@ menu_device_setup() {
                 set_address_dialog retval
                 if [[ "$retval" != "" ]]; then
                     modbus_write_param $WB_REG_ADDRESS $retval
-                    show_yes_no_dialog "PROMPT" \
+                    show_yes_no_dialog "CONFIRMATION" \
                         "
             Do you want to change device address\n \
             in current device settings to $retval?"
@@ -516,7 +517,7 @@ menu_device_setup() {
                 if [[ "$retval" != "" ]]; then
                     tmp_arg=$(($retval / 100))
                     modbus_write_param $WB_REG_BAUDRATE $tmp_arg
-                    show_yes_no_dialog "PROMPT" \
+                    show_yes_no_dialog "CONFIRMATION" \
                         "
             Do you want to change baudrate\n \
             in current comm settings to $retval?"
@@ -540,7 +541,7 @@ menu_device_setup() {
                     esac
                     modbus_write_param $WB_REG_PARITY $tmp_arg
 
-                    show_yes_no_dialog "PROMPT" \
+                    show_yes_no_dialog "CONFIRMATION" \
                         "
             Do you want to change parity\n \
             in current comm settings to $retval?"
@@ -558,7 +559,7 @@ menu_device_setup() {
                 if [[ "$retval" != "" ]]; then
                     modbus_write_param $WB_REG_STOPBITS $retval
 
-                    show_yes_no_dialog "PROMPT" \
+                    show_yes_no_dialog "CONFIRMATION" \
                         "
             Do you want to change stopbits\n \
             in current comm settings to $retval?"
@@ -591,7 +592,7 @@ menu_device_setup() {
                     modbus_write_param $WB_REG_ADDRESS 1
                     MB_ADDRESS=$tmp_addr
 
-                    show_yes_no_dialog "PROMPT" \
+                    show_yes_no_dialog "CONFIRMATION" \
                         "
             Do you want to change device address\n \
             in current device settings to 1?"
@@ -645,7 +646,7 @@ menu_device_setup() {
                     show_info_box "\n       Procedure finished!"
                     sleep 2
 
-                    show_yes_no_dialog "PROMPT" \
+                    show_yes_no_dialog "CONFIRMATION" \
                         "
             Do you want to change comm settings\n \
                     to default falues?"
@@ -826,7 +827,7 @@ network_scan() {
             done
         done
     ) |
-        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 30 135 5
+        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 30 135 0
 
     write_log "$(cat $TMP_FILE)"
     $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "OK" --textbox $TMP_FILE 30 135
@@ -955,7 +956,7 @@ update_all_devices_fw_from_internet() {
     show_yes_no_dialog "WARNING" \
         "   
                       Attention!\n
- Firmware updating process may take up to several minutes.\n
+Firmware updating process may take up to several minutes.\n
                 Don't interrupt this process!!!\n
           Otherwise you will damage your devices!!!\n\n        
 
@@ -1083,7 +1084,7 @@ menu_main() {
             ;;
         $DIALOG_HELP)
             show_help "HELP" "\n                                              This is a short user guide of WB-MW-EXPLORER tool\n\n
-            WB-MW-EXPLORER is a tool for easy scan and configuration network for Wirenboard Modbus devices. \n
+            WB-MW-EXPLORER is a tool for easy scan and configuration network for Wirenboard Modbus RTU devices. \n
             It is a graphical wrapper for modbus_client, wb-mcu-fw-flasher and wb-mcu-fw-updater tools. \n
             Configuration is stored in /etc/wb-mb-explorer.conf file, log of last session is stored in /var/log/wb-mb-explorer.log file. \n\n
             1 Settings  -   lets user to choose communication settings, which will be used for communication\n
