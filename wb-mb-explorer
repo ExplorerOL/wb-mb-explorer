@@ -59,20 +59,20 @@ show_exit_dialog() {
 
 # show message box
 show_msg_box() {
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$1" --msgbox "\n    $2" 20 80
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "$1" --msgbox "\n    $2" 20 80
 }
 
 # show help
 show_help() {
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$1" --msgbox "\n    $2" 30 150
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "$1" --msgbox "\n    $2" 30 150
 }
 
 show_yes_no_dialog() {
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$1" --yesno "\n    $2" 15 61
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "$1" --yesno "\n    $2" 15 61
 }
 
 show_info_box() {
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "INFO" --infobox "$1" 5 50
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "INFO" --infobox "$1" 5 50
 }
 
 read_communication_settings() {
@@ -106,8 +106,9 @@ save_communication_settings() {
 }
 
 menu_settings() {
+    clear
     while [ 1 ]; do
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "SETTINGS" --clear --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "SETTINGS" --help-button --ok-label "Select item" --cancel-label "Save settings" --help-label "Main menu" \
             --menu "\n
             Current communication settings: \n\
                 Port: $COM_PORT \n\
@@ -184,7 +185,7 @@ set_baudrate_dialog() {
 }
 
 set_parity_dialog() {
-    $DIALOG --title "Parity" --radiolist "Choose avaliable option for parity:" 20 61 5 \
+    $DIALOG --clear --title "Parity" --radiolist "Choose avaliable option for parity:" 20 61 5 \
         "N" "none" ON \
         "O" "odd" off \
         "E" "even" off 2>$TMP_FILE
@@ -217,7 +218,7 @@ set_stopbits_dialog() {
 }
 
 set_address_dialog() {
-    $DIALOG --title "Enter address of Modbus device" --inputbox "Enter address of Modbus device you wnat to work with (from 1 to 247)" 16 51 2>$TMP_FILE
+    $DIALOG --clear --title "Enter address of Modbus device" --inputbox "Enter address of Modbus device you wnat to work with (from 1 to 247)" 16 51 2>$TMP_FILE
 
     case $? in
     $DIALOG_OK)
@@ -234,7 +235,7 @@ set_address_dialog() {
 
 set_mb_register() {
 
-    $DIALOG --title "Enter address of Modbus register" --inputbox "Enter address of Modbus register in decimal or hex (0x12345)" 16 51 2>$TMP_FILE
+    $DIALOG --clear --title "Enter address of Modbus register" --inputbox "Enter address of Modbus register in decimal or hex (0x12345)" 16 51 2>$TMP_FILE
 
     case $? in
     $DIALOG_OK)
@@ -349,7 +350,7 @@ show_device_info() {
 
         echo "" >$TMP_FILE
         read_device_info
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "SHOW DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "SHOW DEVICE INFO" --ok-label "Read again" --extra-button --extra-label "Main menu" --textbox $TMP_FILE 20 90
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -397,7 +398,7 @@ read_register() {
             echo "$readResult" >>$TMP_FILE
         fi
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "READ REGISTER" --ok-label "Read register again" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 90 # echo "start dialog" > $TMP_FILE
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "READ REGISTER" --ok-label "Read register again" --extra-button --extra-label "Write to register" --help-button --help-label "Main menu" --textbox $TMP_FILE 25 90 # echo "start dialog" > $TMP_FILE
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -425,7 +426,7 @@ write_register() {
         ;;
     esac
 
-    $DIALOG --title "WRITE REGISTER" --inputbox "Enter new register value in decimal (100) or hex (0x64)" 16 51 2>$TMP_FILE
+    $DIALOG --clear --title "WRITE REGISTER" --inputbox "Enter new register value in decimal (100) or hex (0x64)" 16 51 2>$TMP_FILE
 
     local input_value="$(cat $TMP_FILE)"
 
@@ -439,7 +440,7 @@ write_register() {
 
         fi
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "WRITE RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "WRITE RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
 
     else
 
@@ -460,10 +461,11 @@ modbus_write_param() {
         echo -e "\n                     Error during executing command!!!\n\n$write_result" >$TMP_FILE
 
     fi
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "COMMAND EXECUTING RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "COMMAND EXECUTING RESULTS" --exit-label "OK" --textbox $TMP_FILE 18 80
 }
 
 menu_device_setup() {
+    clear
     local tmp_arg
 
     while [ 1 ]; do
@@ -475,7 +477,7 @@ menu_device_setup() {
             current_device_info=$(echo "Device is unavailable!")
         fi
 
-        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "DEVICE SETUP" \
+        $DIALOG --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "DEVICE SETUP" \
             --menu "\n 
     Current communication settings:\n 
         Port:$COM_PORT Address:$MB_ADDRESS Baudrate:$BAUDRATE Parity:$PARITY Stopbits:$STOPBITS\n\n
@@ -691,8 +693,9 @@ menu_device_setup() {
 }
 
 menu_network_scan() {
+    clear
     while [ 1 ]; do
-        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "NETWORK SCAN" \
+        $DIALOG --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "NETWORK SCAN" \
             --menu "\n 
     Current communication settings: \n\
         Port: $COM_PORT \n\
@@ -706,14 +709,14 @@ menu_network_scan() {
         Chose action to do" 30 120 8 \
             "Comm settings scan" "Detection communication settings of device with address $MB_ADDRESS at port $COM_PORT" \
             "Scan of addresses" "Scan network for devices using current communication settings" \
-            "Complete scan" "Scan network for devices using all possible communication settings" 2>$TMP_FILE
+            "Complete network scan" "Scan network for devices using all possible communication settings" 2>$TMP_FILE
 
         case $? in
         $DIALOG_OK)
             case $(cat $TMP_FILE) in
             "Comm settings scan") network_scan "comm_settings" ;;
             "Scan of addresses") network_scan "address" ;;
-            "Complete scan") network_scan "complete" ;;
+            "Complete network scan") network_scan "complete" ;;
             esac
             ;;
         $DIALOG_HELP)
@@ -721,7 +724,7 @@ menu_network_scan() {
         Comm settings scan - tool tries to communicate with device using specified port, address\n
                              and all combinations of other communication settings\n\n
         Scan of addresses - tool searches for devices using specified port and communication settings\n\n
-        Complete scan - tool searches for devices using specified port. All possible combinations\n
+        Complete network scan - tool searches for devices using specified port. All possible combinations\n
                         will be used\n"
             ;;
         *) return ;;
@@ -748,7 +751,7 @@ network_scan() {
     local scan_parity="none odd even"
     local scan_stopbits="1 2"
     local scan_quantity=11856
-    local dialog_title="COMPLETE DEVICE SCAN"
+    local dialog_title="COMPLETE NETWORK SCAN"
 
     case "$1" in
     "comm_settings")
@@ -827,15 +830,16 @@ network_scan() {
             done
         done
     ) |
-        $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 30 135 0
+        $DIALOG --clear --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --gauge "progress bar" 30 135 0
 
     write_log "$(cat $TMP_FILE)"
-    $DIALOG --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "OK" --textbox $TMP_FILE 30 135
+    $DIALOG --clear --title "$dialog_title" --backtitle "$DIALOG_BACKTITLE" --exit-label "OK" --textbox $TMP_FILE 30 135
 }
 
 menu_fw_update() {
+    clear
     while [ 1 ]; do
-        ${DIALOG} --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FIRMWARE UPDATE" \
+        $DIALOG --clear --help-button --cancel-label "Main Menu" --backtitle "$DIALOG_BACKTITLE" --title "FIRMWARE UPDATE" \
             --menu "\n                                                   Attention!!! \n\n \
         These functions are intended for updating firmwares of devices connected via RS-485 network. \n \
         Do not do this if you are not sure in correctness of your actions. \n\n\
@@ -914,7 +918,7 @@ update_device_fw_from_internet() {
                     Firmware updating process may take up to several minutes.\n
                     Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
 
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "$button_title" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "$button_title" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
     case $? in
     $DIALOG_OK)
@@ -935,7 +939,7 @@ update_device_fw_from_internet() {
 
         echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
 
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "DEVICE FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -970,7 +974,7 @@ Firmware updating process may take up to several minutes.\n
         wb-mcu-fw-updater update-all 2>&1 | tee -a $TMP_FILE
         sleep 2
         sed -i -e 's/[[:cntrl:]]//g' -e 's/\[..//g' -e 's/\;10.//g' $TMP_FILE
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "ALL DEVICES FW UPDATE" --exit-label "OK" --textbox $TMP_FILE 45 150
         local dialog_button=$?
 
         write_log "$(cat $TMP_FILE)"
@@ -1000,7 +1004,7 @@ update_fw_using_file() {
                     Don't interrupt this process!!! Otherwise you will damage your device!!!\n" >>$TMP_FILE
 
     while [ 1 ]; do
-        $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Select FW file" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
+        $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --ok-label "Select FW file" --extra-button --extra-label "Cancel" --textbox $TMP_FILE 28 120
 
         case $? in
         $DIALOG_OK)
@@ -1026,7 +1030,7 @@ update_fw_using_file() {
                 read_device_info
 
                 echo -e "$tmp_info\n $(cat $TMP_FILE)" >$TMP_FILE
-                $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 45 150
+                $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "$window_title" --exit-label "OK" --textbox $TMP_FILE 45 150
                 write_log "$(cat $TMP_FILE)"
                 return
             else
@@ -1041,11 +1045,11 @@ update_fw_using_file() {
 }
 
 show_log_file() {
-    $DIALOG --backtitle "$DIALOG_BACKTITLE" --title "LOG FILE" --exit-label "OK" --textbox $LOG_FILE 32 150
+    $DIALOG --clear --backtitle "$DIALOG_BACKTITLE" --title "LOG FILE" --exit-label "OK" --textbox $LOG_FILE 32 150
 }
 
 menu_main() {
-
+    clear
     while [ 1 ]; do
         $DIALOG --clear --help-button --cancel-label "Exit" --backtitle "$DIALOG_BACKTITLE" --title "MAIN MENU" \
             --menu "\n
